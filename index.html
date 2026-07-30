@@ -442,6 +442,27 @@
     ]
   ];
 
+  // Precomputed winning move-sequences (U/D/L/R) for each level's initial state,
+  // generated offline since a couple of these need a search far too deep to run live in-browser.
+  // Speed Run replays these directly instead of solving from scratch.
+  const SOLUTIONS = [
+    "DULLRUUDRR",
+    "DDDDRDDLLURDRULUUUUULLDRURDDDDRRRDRUUDLLLDDLLURDRULUUUULLDRURDDDRRRDRULLLDDLLURDRULURRR",
+    "DRDRDDLLRRUULDLDRUUULDDUUUURDDDD",
+    "RDRRDDRDDLLULLDLURRRDLLRRRRUULUULLDDUURRDDRDDLLULL",
+    "DRRRURRUULLDDLDLLURRRUURRDLULDULDD",
+    "DLLDLLURRDDDRRUULLULLDRURURRD",
+    "LUURRUUDDLLDDRRUUDDRRULDLLLUURRURDLLLDDRRUURULDDDRUULLUU",
+    "URLDDRURRDLRDRRULLUUURRDLDLDDRRULULLLLUURDLDRRLLDDRULUR",
+    "ULULUURRRDDRDLUUULLDRURDDRDDRRULDLUDLUDLLURRLLULURURRDDUULLDRURD",
+    "RUULURUULLLDLDDRUUDDLDDRUUURRUDDRUUDDDDLUUUDDLUDLDLUUURRRDRU",
+    "RDRDDDDLLUULUDRDDRRUULRUULDLDLLURRRURRDLDLLURDRULLLLDRRURRDDDLLUURUUULLDDLDRRLUUURRDDRRULDLLDDDRRUUDDLLUURLLLURUURRDDLDLURRURRDLLLDDDRRUUDDLLUURUURRDLDLLURDLLLURDRRUUULLD",
+    "DLDDDDLLUUURLDDDRRUUULLDRDUURURUULDULLDRDDUUURRDLRDLDLLDDRRUULDURURUULDULLDRDDUUURRDLULDDURRDL",
+    "DLDLDURUULDLLURRDRDDLURULULLDDRLUURRDDURRULLRUULDDRDDLLLUURDLDR",
+    "DRRULDLULUUUURRDDLDDLDRUUURRRURRDLLLLUULLDDDRDRRRRUDLLLLULUUURRDDRDURURRDLDDLLUURURDLLLUULLDDDRDDLUUURRRDDLRUULLDLDDRURRUURURRDLLLLUULLDDDDRRRDLURRRUDLLUULLRUULLDDDURRRRURRDLLLLLRUULLDD",
+    "LUUUURRRDDLLRRUULLLDDLDDRRRUDLLLUURRRLLUURRRDRDDLULLLLDDRRRURULDDLLLUURUURRRDRDDLLDLLUUDDRRUULRDRRULL"
+  ];
+
   const boardEl = document.getElementById('board');
   const messageEl = document.getElementById('message');
   const moveCountEl = document.getElementById('moveCount');
@@ -690,6 +711,37 @@
       .forEach((b) => { b.disabled = disabled; });
   }
 
+  const DIR_DELTA = { U: [-1, 0], D: [1, 0], L: [0, -1], R: [0, 1] };
+
+  // True if nothing has moved yet this level (fresh load or after Reset).
+  function isAtLevelStart() {
+    const rows = LEVELS[currentLevel];
+    const initialBoxes = new Set();
+    let initialPlayer = null;
+    rows.forEach((row, r) => {
+      [...row].forEach((ch, c) => {
+        if (ch === '$' || ch === '*') initialBoxes.add(key(r, c));
+        if (ch === '@' || ch === '+') initialPlayer = { r, c };
+      });
+    });
+    const boxesMatch = [...initialBoxes].sort().join('|') === [...boxes].sort().join('|');
+    return boxesMatch && initialPlayer.r === player.r && initialPlayer.c === player.c;
+  }
+
+  // A couple of levels need a search far too deep to run live in the browser, so when
+  // the board is untouched we replay the precomputed SOLUTIONS entry instead of
+  // searching from scratch. Once the player has actually moved something, we fall back
+  // to the live BFS below (which is fine for the shorter re-plans that implies).
+  function getSolutionMoves() {
+    if (SOLUTIONS[currentLevel] && isAtLevelStart()) {
+      return [...SOLUTIONS[currentLevel]].map((ch) => {
+        const [dr, dc] = DIR_DELTA[ch];
+        return { dr, dc };
+      });
+    }
+    return findSolution();
+  }
+
   function runSolver() {
     if (solving || isWon()) return;
     solving = true;
@@ -702,7 +754,7 @@
 
     // Defer so the "Searching…" message paints before the (synchronous) BFS runs.
     setTimeout(() => {
-      const solution = findSolution();
+      const solution = getSolutionMoves();
       if (!solution) {
         messageEl.textContent = "No solution found from here (state limit reached) — try Reset.";
         solving = false;
