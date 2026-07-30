@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>How the Boxman Solver Works</title>
+<meta name="description" content="An interactive look at how Boxman's AI solves Sokoban puzzles with breadth-first search." />
+<style>
+  :root {
+    --bg: #1e1e2e;
+    --panel: #262638;
+    --panel2: #2f2f45;
+    --wall: #45475a;
+    --wall-edge: #313244;
+    --floor: #11111b;
+    --target: #313244;
+    --target-dot: #f9e2af;
+    --box: #cba6f7;
+    --box-edge: #a97ff0;
+    --box-done: #a6e3a1;
+    --box-done-edge: #7fd07a;
+    --player: #89b4fa;
+    --player-edge: #5f8fdb;
+    --text: #cdd6f4;
+    --muted: #9399b2;
+    --accent: #f38ba8;
+    --heat: #f9e2af;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    line-height: 1.6;
+  }
+  body { display: flex; flex-direction: column; align-items: center; padding: 24px 16px 60px; }
+  .page { width: 100%; max-width: 780px; }
+  nav.top { display: flex; gap: 16px; justify-content: center; margin-bottom: 20px; font-size: 0.9rem; }
+  nav.top a { color: var(--muted); text-decoration: none; }
+  nav.top a:hover { color: var(--accent); }
+  h1 { font-size: 1.8rem; margin: 0 0 4px; letter-spacing: 1px; text-align: center; }
+  h1 span { color: var(--accent); }
+  .lede { color: var(--muted); text-align: center; margin-bottom: 32px; }
+  h2 { font-size: 1.2rem; margin-top: 42px; color: var(--text); border-left: 3px solid var(--accent); padding-left: 10px; }
+  p { color: #c8ccdc; }
+  code { background: var(--panel2); padding: 1px 6px; border-radius: 5px; font-size: 0.9em; }
+  .callout {
+    background: var(--panel); border-radius: 10px; padding: 14px 18px; margin: 16px 0;
+    color: var(--muted); font-size: 0.92rem;
+  }
+  .callout b { color: var(--text); }
+
+  .demo {
+    background: var(--panel); border-radius: 14px; padding: 20px; margin: 20px 0;
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+  }
+  #miniBoard {
+    display: grid; gap: 2px; background: var(--wall-edge); padding: 5px; border-radius: 8px;
+  }
+  .mcell {
+    width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+    border-radius: 3px; position: relative; transition: background-color 0.25s ease;
+  }
+  .mcell.wall { background: linear-gradient(145deg, var(--wall), #383a4d); }
+  .mcell.floor { background: var(--floor); }
+  .mcell.target { background: var(--target); }
+  .mcell .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--target-dot); position: absolute; }
+  .mcell .box { width: 76%; height: 76%; background: var(--box); border: 2px solid var(--box-edge); border-radius: 5px; position: absolute; }
+  .mcell .box.done { background: var(--box-done); border-color: var(--box-done-edge); }
+  .mcell .mplayer { width: 60%; height: 60%; background: var(--player); border: 2px solid var(--player-edge); border-radius: 50%; position: absolute; z-index: 2; }
+  .mcell .heat { position: absolute; inset: 0; background: var(--heat); border-radius: 3px; pointer-events: none; }
+
+  .demo-stats { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; font-size: 0.85rem; }
+  .demo-stats .stat { background: var(--panel2); padding: 6px 12px; border-radius: 8px; color: var(--muted); }
+  .demo-stats .stat b { color: var(--text); }
+  .demo-msg { min-height: 22px; font-size: 0.95rem; font-weight: 600; color: var(--box-done); text-align: center; }
+  .demo-controls { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  button {
+    background: var(--wall); color: var(--text); border: none; padding: 8px 16px;
+    border-radius: 8px; cursor: pointer; font-size: 0.85rem;
+  }
+  button:hover { background: var(--box-edge); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.primary { background: var(--accent); color: #2a2a3a; font-weight: 600; }
+
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.88rem; }
+  th, td { padding: 7px 10px; text-align: left; border-bottom: 1px solid #383a4d; }
+  th { color: var(--muted); font-weight: 600; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.highlight td { color: var(--accent); }
+
+  footer { color: var(--muted); font-size: 0.8rem; text-align: center; margin-top: 40px; }
+  a.inline { color: var(--player); }
+</style>
+</head>
+<body>
+<div class="page">
+  <nav class="top">
+    <a href="index.html">← Play Boxman</a>
+    <a href="level-editor.html">Level Editor</a>
+  </nav>
+
+  <h1>How the <span>Solver</span> Works</h1>
+  <div class="lede">A behind-the-scenes look at the algorithm that solves every Boxman level — and plays them back-to-back in Speed Run.</div>
+
+  <h2>It doesn't "see" the board — it searches a space of states</h2>
+  <p>
+    The solver doesn't reason about pixels, sprites, or the puzzle visually the way you do. It reduces every level to a plain
+    fact: <b>a state is the player's position plus the exact set of box positions.</b> Two states are "the same" if every box
+    is in the same place and the player is standing in the same cell — nothing else about the board matters.
+  </p>
+  <p>
+    Solving the puzzle becomes a graph problem: starting from the level's initial state, explore every state reachable by one
+    move (up/down/left/right — pushing a box if one is in the way), then every state reachable from <i>those</i>, and so on,
+    until a state is found where every target has a box sitting on it.
+  </p>
+
+  <h2>Breadth-first search: try everything, one layer at a time</h2>
+  <p>
+    This is <b>breadth-first search (BFS)</b>. It explores states in layers — first every state reachable in 1 move, then in 2
+    moves, then 3 — never skipping ahead. The moment a winning state turns up, the search stops, and because every state one
+    layer out is reached before any state two layers out, the first solution found is guaranteed to be the <i>shortest possible</i>
+    one, measured in player moves.
+  </p>
+  <div class="callout">
+    <b>Why not just try random moves, or push boxes greedily toward targets?</b> Sokoban is notoriously deceptive — a box pushed
+    into the wrong corner can be stuck forever, and the correct first move is often not the one that looks like progress. BFS
+    doesn't guess; it exhaustively rules out nothing until it finds what actually works.
+  </div>
+
+  <h2>Watch it happen</h2>
+  <p>
+    Below is <b>Level 1</b> from the actual game. Hit <b>Run Search</b> to watch BFS fan out one layer at a time — the glow
+    shows every cell the player has stood on across all states explored so far. When a solution is found, hit
+    <b>Replay Solution</b> to watch the shortest path play out.
+  </p>
+
+  <div class="demo">
+    <div id="miniBoard"></div>
+    <div class="demo-msg" id="demoMsg">Ready.</div>
+    <div class="demo-stats">
+      <div class="stat">Layer (moves deep): <b id="statLayer">0</b></div>
+      <div class="stat">States explored: <b id="statExplored">0</b></div>
+      <div class="stat">Solution length: <b id="statSolLen">—</b></div>
+    </div>
+    <div class="demo-controls">
+      <button id="runBtn" class="primary">▶ Run Search</button>
+      <button id="replayBtn" disabled>⏮ Replay Solution</button>
+      <button id="resetDemoBtn">Reset</button>
+    </div>
+  </div>
+
+  <h2>Why some levels are so much harder</h2>
+  <p>
+    Every extra box roughly multiplies the number of possible arrangements, so the state space grows combinatorially, not
+    linearly. A level with 3 boxes might have a few thousand reachable states; a level with 8 boxes can have <i>millions</i>.
+    Here's what BFS actually had to explore for each of Boxman's 15 levels (capped at 500,000 for this table — several levels
+    blow straight through that):
+  </p>
+
+  <table id="statsTable">
+    <thead><tr><th>Level</th><th>Boxes</th><th class="num">States explored</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <h2>Why Speed Run doesn't search live for every level</h2>
+  <p>
+    The in-game <b>Solve</b> button caps its live search at 300,000 states so the browser tab never freezes waiting on it.
+    That's plenty for most levels — but four of them (8, 10, 12, and 14) need well over a million states to crack, and one of
+    them took nearly two minutes of dedicated searching offline to solve at all. Running that live, on every level, every time
+    Speed Run plays, would mean sitting through minutes of a frozen page.
+  </p>
+  <p>
+    Instead, the exact winning move sequence for all 15 levels was solved once, offline, with no time pressure — the same BFS
+    algorithm shown above, just given as long as it needed. Speed Run replays those known solutions instantly. If you've
+    already made moves of your own on a level, though, <b>Solve</b> still falls back to a live search from wherever you
+    actually are.
+  </p>
+
+  <footer>
+    <a class="inline" href="index.html">Play Boxman</a> · <a class="inline" href="level-editor.html">Build a level</a> ·
+    <a class="inline" href="https://github.com/HassanRasoo98/boxman" target="_blank" rel="noopener">Source on GitHub</a>
+  </footer>
+</div>
+
+<script>
+(function () {
+  // The real Level 1 from index.html, used verbatim so this demo reflects the actual game.
+  const LEVEL = [
+    "###########",
+    "###########",
+    "####.######",
+    "#### ######",
+    "####$ $.###",
+    "##. $@#####",
+    "#####$#####",
+    "#####.#####",
+    "###########",
+    "###########",
+    "###########"
+  ];
+  const SOLUTION = "DULLRUUDRR";
+  const DIR_DELTA = { U: [-1, 0], D: [1, 0], L: [0, -1], R: [0, 1] };
+
+  const STATS = [
+    { level: 1, boxes: 4, explored: 117 },
+    { level: 2, boxes: 3, explored: 23964 },
+    { level: 3, boxes: 5, explored: 2710 },
+    { level: 4, boxes: 3, explored: 2754 },
+    { level: 5, boxes: 5, explored: 142436 },
+    { level: 6, boxes: 4, explored: 82828 },
+    { level: 7, boxes: 4, explored: 53114 },
+    { level: 8, boxes: 6, explored: 500000, capped: true },
+    { level: 9, boxes: 4, explored: 192183 },
+    { level: 10, boxes: 8, explored: 500000, capped: true },
+    { level: 11, boxes: 4, explored: 102727 },
+    { level: 12, boxes: 5, explored: 500000, capped: true },
+    { level: 13, boxes: 5, explored: 77005 },
+    { level: 14, boxes: 5, explored: 500000, capped: true },
+    { level: 15, boxes: 3, explored: 15135 }
+  ];
+
+  function key(r, c) { return r + ',' + c; }
+
+  function parse(rows) {
+    const grid = [];
+    const targets = new Set();
+    const boxes = new Set();
+    let player = null;
+    rows.forEach((row, r) => {
+      const gridRow = [];
+      [...row].forEach((ch, c) => {
+        gridRow.push(ch === '#' ? 'wall' : 'floor');
+        if (ch === '.' || ch === '*' || ch === '+') targets.add(key(r, c));
+        if (ch === '$' || ch === '*') boxes.add(key(r, c));
+        if (ch === '@' || ch === '+') player = { r, c };
+      });
+      grid.push(gridRow);
+    });
+    return { grid, targets, boxes, player };
+  }
+
+  const { grid, targets, boxes: initialBoxes, player: initialPlayer } = parse(LEVEL);
+
+  function isWall(r, c) {
+    if (r < 0 || r >= grid.length) return true;
+    if (c < 0 || c >= grid[r].length) return true;
+    return grid[r][c] === 'wall';
+  }
+
+  // Trim the board down to just the region that actually has floor, so the mini
+  // board isn't mostly empty wall padding.
+  let minR = grid.length, maxR = -1, minC = grid[0].length, maxC = -1;
+  grid.forEach((row, r) => row.forEach((cell, c) => {
+    if (cell !== 'wall') {
+      minR = Math.min(minR, r); maxR = Math.max(maxR, r);
+      minC = Math.min(minC, c); maxC = Math.max(maxC, c);
+    }
+  }));
+  minR = Math.max(0, minR - 1); maxR = Math.min(grid.length - 1, maxR + 1);
+  minC = Math.max(0, minC - 1); maxC = Math.min(grid[0].length - 1, maxC + 1);
+
+  const boardEl = document.getElementById('miniBoard');
+  const cols = maxC - minC + 1, rows = maxR - minR + 1;
+  boardEl.style.gridTemplateColumns = `repeat(${cols}, 32px)`;
+
+  const cellEls = {};
+  function buildBoard() {
+    boardEl.innerHTML = '';
+    for (let r = minR; r <= maxR; r++) {
+      for (let c = minC; c <= maxC; c++) {
+        const div = document.createElement('div');
+        div.className = 'mcell ' + (isWall(r, c) ? 'wall' : (targets.has(key(r, c)) ? 'target' : 'floor'));
+        boardEl.appendChild(div);
+        cellEls[key(r, c)] = div;
+      }
+    }
+  }
+  buildBoard();
+
+  function renderState(boxes, player, heat) {
+    for (let r = minR; r <= maxR; r++) {
+      for (let c = minC; c <= maxC; c++) {
+        const k = key(r, c);
+        const el = cellEls[k];
+        if (!el || isWall(r, c)) continue;
+        el.innerHTML = '';
+        const isTarget = targets.has(k);
+        if (heat && heat.has(k)) {
+          const h = document.createElement('div');
+          h.className = 'heat';
+          h.style.opacity = Math.min(0.85, 0.15 + heat.get(k) * 0.12);
+          el.appendChild(h);
+        }
+        if (isTarget) { const d = document.createElement('div'); d.className = 'dot'; el.appendChild(d); }
+        if (boxes.has(k)) { const b = document.createElement('div'); b.className = 'box' + (isTarget ? ' done' : ''); el.appendChild(b); }
+        if (player && player.r === r && player.c === c) { const p = document.createElement('div'); p.className = 'mplayer'; el.appendChild(p); }
+      }
+    }
+  }
+  renderState(initialBoxes, initialPlayer, null);
+
+  const runBtn = document.getElementById('runBtn');
+  const replayBtn = document.getElementById('replayBtn');
+  const resetBtn = document.getElementById('resetDemoBtn');
+  const msgEl = document.getElementById('demoMsg');
+  const statLayer = document.getElementById('statLayer');
+  const statExplored = document.getElementById('statExplored');
+  const statSolLen = document.getElementById('statSolLen');
+
+  let running = false;
+
+  function runSearchAnimated() {
+    if (running) return;
+    running = true;
+    runBtn.disabled = true;
+    replayBtn.disabled = true;
+    resetBtn.disabled = true;
+    msgEl.textContent = 'Searching…';
+    statLayer.textContent = '0';
+    statExplored.textContent = '0';
+    statSolLen.textContent = '—';
+
+    const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+    const boxSetKey = (set) => [...set].sort().join('|');
+    const isWinBoxes = (boxSet) => { for (const t of targets) if (!boxSet.has(t)) return false; return true; };
+
+    const startPlayerKey = key(initialPlayer.r, initialPlayer.c);
+    const startState = startPlayerKey + '/' + boxSetKey(initialBoxes);
+    const seen = new Set([startState]);
+    let frontier = [{ playerKey: startPlayerKey, boxes: new Set(initialBoxes), state: startState }];
+    let explored = 0;
+    let depth = 0;
+    const heat = new Map();
+    let solved = false;
+
+    function bumpHeat(k) { heat.set(k, (heat.get(k) || 0) + 1); }
+    bumpHeat(startPlayerKey);
+
+    function step() {
+      if (solved || !frontier.length) {
+        renderState(initialBoxes, initialPlayer, heat);
+        msgEl.textContent = solved
+          ? `Solved! Shortest path is ${solved.length} moves after exploring ${explored} states.`
+          : 'Exhausted the reachable states without finding a solution (shouldn\'t happen here).';
+        statSolLen.textContent = solved ? solved.length : '—';
+        running = false;
+        runBtn.disabled = false;
+        resetBtn.disabled = false;
+        replayBtn.disabled = !solved;
+        window.__lastSolution = solved;
+        return;
+      }
+
+      depth++;
+      const next = [];
+      const cameFrom = step.cameFrom || (step.cameFrom = new Map());
+      for (const cur of frontier) {
+        explored++;
+        const [pr, pc] = cur.playerKey.split(',').map(Number);
+        for (const [dr, dc] of dirs) {
+          const nr = pr + dr, nc = pc + dc, nk = key(nr, nc);
+          if (isWall(nr, nc)) continue;
+          let newBoxes = cur.boxes;
+          if (cur.boxes.has(nk)) {
+            const br = nr + dr, bc = nc + dc, bk = key(br, bc);
+            if (isWall(br, bc) || cur.boxes.has(bk)) continue;
+            newBoxes = new Set(cur.boxes);
+            newBoxes.delete(nk);
+            newBoxes.add(bk);
+          }
+          const nstate = nk + '/' + boxSetKey(newBoxes);
+          if (seen.has(nstate)) continue;
+          seen.add(nstate);
+          cameFrom.set(nstate, { prev: cur.state, dr, dc });
+          bumpHeat(nk);
+          if (isWinBoxes(newBoxes)) {
+            const path = [];
+            let s = nstate;
+            while (s !== startState) {
+              const info = cameFrom.get(s);
+              path.push(info.dr + ',' + info.dc);
+              s = info.prev;
+            }
+            path.reverse();
+            solved = path.map(p => { const [dr, dc] = p.split(',').map(Number); return { dr, dc }; });
+            break;
+          }
+          next.push({ playerKey: nk, boxes: newBoxes, state: nstate });
+        }
+        if (solved) break;
+      }
+      frontier = next;
+
+      renderState(initialBoxes, initialPlayer, heat);
+      statLayer.textContent = depth;
+      statExplored.textContent = explored;
+      msgEl.textContent = `Exploring states reachable in exactly ${depth} move${depth === 1 ? '' : 's'}…`;
+
+      setTimeout(step, solved ? 400 : 260);
+    }
+
+    step();
+  }
+
+  function replaySolution() {
+    const solution = window.__lastSolution;
+    if (!solution) return;
+    replayBtn.disabled = true;
+    runBtn.disabled = true;
+    resetBtn.disabled = true;
+    let boxes = new Set(initialBoxes);
+    let player = { ...initialPlayer };
+    renderState(boxes, player, null);
+    msgEl.textContent = 'Replaying the shortest solution…';
+    let i = 0;
+    const timer = setInterval(() => {
+      if (i >= solution.length) {
+        clearInterval(timer);
+        msgEl.textContent = `Done — solved in ${solution.length} moves.`;
+        replayBtn.disabled = false;
+        runBtn.disabled = false;
+        resetBtn.disabled = false;
+        return;
+      }
+      const { dr, dc } = solution[i];
+      const nr = player.r + dr, nc = player.c + dc, nk = key(nr, nc);
+      if (boxes.has(nk)) {
+        const br = nr + dr, bc = nc + dc, bk = key(br, bc);
+        boxes.delete(nk);
+        boxes.add(bk);
+      }
+      player = { r: nr, c: nc };
+      renderState(boxes, player, null);
+      i++;
+    }, 380);
+  }
+
+  function resetDemo() {
+    window.__lastSolution = null;
+    running = false;
+    runBtn.disabled = false;
+    replayBtn.disabled = true;
+    resetBtn.disabled = false;
+    msgEl.textContent = 'Ready.';
+    statLayer.textContent = '0';
+    statExplored.textContent = '0';
+    statSolLen.textContent = '—';
+    renderState(initialBoxes, initialPlayer, null);
+  }
+
+  runBtn.addEventListener('click', runSearchAnimated);
+  replayBtn.addEventListener('click', replaySolution);
+  resetBtn.addEventListener('click', resetDemo);
+
+  // ---- stats table ----
+  const tbody = document.querySelector('#statsTable tbody');
+  STATS.forEach(s => {
+    const tr = document.createElement('tr');
+    if (s.capped) tr.classList.add('highlight');
+    tr.innerHTML = `<td>Level ${s.level}</td><td>${s.boxes}</td><td class="num">${s.explored.toLocaleString()}${s.capped ? '+' : ''}</td>`;
+    tbody.appendChild(tr);
+  });
+})();
+</script>
+</body>
+</html>
