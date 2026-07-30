@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Boxman — Algorithm Benchmark</title>
+<style>
+  :root {
+    --bg: #1e1e2e;
+    --panel: #262638;
+    --panel2: #2f2f45;
+    --wall: #45475a;
+    --wall-edge: #313244;
+    --text: #cdd6f4;
+    --muted: #9399b2;
+    --accent: #f38ba8;
+    --good: #a6e3a1;
+    --bad: #f38ba8;
+    --track: #313244;
+    --grid: #3a3a52;
+    --series-winner: #3987e5;
+    --series-rest: #9399b2;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    min-height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 16px 60px;
+    gap: 18px;
+  }
+  nav { display: flex; gap: 16px; font-size: 0.9rem; }
+  nav a { color: var(--muted); text-decoration: none; }
+  nav a:hover { color: var(--text); }
+  h1 { margin: 0; font-size: 1.6rem; letter-spacing: 1px; }
+  h1 span { color: var(--accent); }
+  .subtitle { color: var(--muted); font-size: 0.88rem; text-align: center; max-width: 720px; margin-top: -8px; }
+  .panel {
+    background: var(--panel);
+    border-radius: 12px;
+    padding: 16px 18px;
+    width: 100%;
+    max-width: 980px;
+  }
+  .panel h2 {
+    margin: 0 0 12px;
+    font-size: 0.95rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .run-meta { font-size: 0.82rem; color: var(--muted); }
+  .run-meta b { color: var(--text); }
+
+  .winner-callout {
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+    background: rgba(57,135,229,0.12); border: 1px solid rgba(57,135,229,0.35);
+    border-radius: 10px; padding: 12px 16px;
+  }
+  .winner-callout .label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .winner-callout .name { font-size: 1.15rem; font-weight: 700; color: var(--series-winner); }
+  .winner-callout .detail { font-size: 0.85rem; color: var(--muted); }
+
+  /* ---- bar chart ---- */
+  .chart { margin-top: 4px; }
+  .chart .gridlines {
+    position: relative;
+    height: 0;
+    margin-left: 190px;
+  }
+  .chart .gridline {
+    position: absolute; top: 0; bottom: 0; width: 1px; background: var(--grid);
+  }
+  .chart .gridline .tick {
+    position: absolute; top: 0; transform: translateX(-50%);
+    font-size: 0.7rem; color: var(--muted); white-space: nowrap;
+  }
+  .chart .rows { position: relative; padding-top: 20px; display: flex; flex-direction: column; gap: 8px; }
+  .bar-row { display: flex; align-items: center; gap: 10px; }
+  .bar-row .bar-label {
+    width: 180px; flex-shrink: 0; text-align: right; font-size: 0.82rem; color: var(--muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .bar-row.is-winner .bar-label { color: var(--text); font-weight: 600; }
+  .bar-row .bar-track {
+    position: relative; flex: 1; height: 18px; background: var(--track); border-radius: 3px;
+  }
+  .bar-row .bar-fill {
+    position: absolute; left: 0; top: 0; height: 100%; min-width: 2px;
+    background: var(--series-rest); border-radius: 0 4px 4px 0;
+  }
+  .bar-row.is-winner .bar-fill { background: var(--series-winner); }
+  .bar-row .bar-value {
+    flex-shrink: 0; min-width: 64px; font-size: 0.8rem; color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .chart-note { font-size: 0.78rem; color: var(--muted); margin-top: 10px; }
+
+  /* ---- matrix table ---- */
+  .table-scroll { width: 100%; overflow-x: auto; }
+  table.matrix { border-collapse: collapse; width: 100%; font-size: 0.78rem; white-space: nowrap; }
+  table.matrix th, table.matrix td { padding: 6px 8px; text-align: right; }
+  table.matrix th { color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--wall-edge); position: sticky; top: 0; background: var(--panel); }
+  table.matrix td.algo-name { text-align: left; color: var(--text); position: sticky; left: 0; background: var(--panel); }
+  table.matrix th.algo-col { text-align: left; position: sticky; left: 0; background: var(--panel); }
+  table.matrix td { color: var(--muted); font-variant-numeric: tabular-nums; }
+  table.matrix td.solved { color: var(--text); }
+  table.matrix td.not-solved { color: var(--bad); opacity: 0.75; }
+  table.matrix tr.winner-row td, table.matrix tr.winner-row td.algo-name { background: rgba(57,135,229,0.10); }
+  table.matrix td.summary-col { border-left: 1px solid var(--wall-edge); font-weight: 600; color: var(--text); }
+
+  .footer-note { color: var(--muted); font-size: 0.78rem; text-align: center; max-width: 720px; }
+  a.footer-link { color: var(--series-winner); }
+</style>
+</head>
+<body>
+  <nav>
+    <a href="index.html">← Play Boxman</a>
+    <a href="how-it-works.html">How the solver works</a>
+    <a href="level-editor.html">Level editor</a>
+  </nav>
+
+  <h1>ALGORITHM <span>BENCHMARK</span></h1>
+  <div class="subtitle">
+    Every search algorithm in solver.js run once against all 15 built-in levels — states explored,
+    wall-clock time, and solution length side by side. This is a precomputed report, not a live
+    tool: the numbers below are fixed, matching what decided the game's default solver.
+  </div>
+
+  <div class="panel">
+    <h2>Run details</h2>
+    <div class="run-meta">
+      State budget per attempt: <b>400,000</b> &nbsp;·&nbsp;
+      Algorithms: <b>9</b> &nbsp;·&nbsp;
+      Levels: <b>15</b> &nbsp;·&nbsp;
+      Total attempts: <b>135</b>
+    </div>
+  </div>
+
+  <div class="panel" id="winnerPanel">
+    <h2>Best performer</h2>
+    <div class="winner-callout">
+      <span class="label">Winner</span>
+      <span class="name" id="winnerName">—</span>
+      <span class="detail" id="winnerDetail"></span>
+    </div>
+    <div class="chart-note" id="winnerNote"></div>
+  </div>
+
+  <div class="panel" id="solvedChartPanel">
+    <h2>Levels solved (out of 15)</h2>
+    <div class="chart" id="solvedChart"></div>
+    <div class="chart-note">Ranked highest to lowest. This is the primary metric — an algorithm that solves fewer levels isn't "faster," it's incomplete within the state budget above.</div>
+  </div>
+
+  <div class="panel" id="statesChartPanel">
+    <h2>Avg. states explored (log scale, solved levels only)</h2>
+    <div class="chart" id="statesChart"></div>
+    <div class="chart-note">Lower is better. Averaged only over the levels each algorithm actually solved, so an algorithm that only solves easy levels isn't unfairly flattered — cross-check against "levels solved" above and the full table below.</div>
+  </div>
+
+  <div class="panel" id="matrixPanel">
+    <h2>Full results</h2>
+    <div class="table-scroll">
+      <table class="matrix" id="matrixTable"></table>
+    </div>
+    <div class="chart-note">Each cell is states explored / time — hyphen means the algorithm didn't find a solution within the state budget for that level.</div>
+  </div>
+
+  <div class="footer-note">
+    This page is a static report — it doesn't change which algorithm plays the game.
+    Pick a solver for actual play from the dropdown on the <a class="footer-link" href="index.html">main game page</a>.
+  </div>
+
+<script src="levels.js"></script>
+<script src="solver.js"></script>
+<script>
+(function () {
+  const LEVELS = window.BOXMAN_LEVELS;
+  const ALGORITHMS = BoxmanSolver.ALGORITHMS;
+
+  // Precomputed by running every algorithm in solver.js once against all 15
+  // levels with a 400,000-state budget per attempt (see levels.js/solver.js
+  // for the level data and algorithm implementations this was generated
+  // from). Each row is [found (1/0), statesExplored, timeMs, solutionLength].
+  const BENCHMARK_DATA = {"bfs":[[1,117,2.88,10],[1,23964,108.21,87],[1,2710,21.77,32],[1,2754,7.7,50],[1,142436,808.21,34],[1,82828,394.49,29],[1,53114,236.21,56],[0,400001,2582.85,null],[1,192183,874.67,64],[0,400001,2730.54,null],[1,102727,439.68,170],[0,400001,2085.86,null],[1,77005,376.77,63],[0,400001,1887.14,null],[1,15135,94.24,101]],"bfs-deadlock":[[1,117,2.34,10],[1,8875,47.77,87],[1,939,5.69,32],[1,1495,4.78,50],[1,8464,55,34],[1,7903,43.19,29],[1,17254,91.36,56],[1,144564,950.32,55],[1,51725,301.42,64],[0,400001,4160.18,null],[1,10892,55.51,170],[1,61118,387.17,94],[1,4983,30.33,63],[1,178721,1106.62,185],[1,2933,11.58,101]],"bidirectional-bfs":[[1,81,0.74,10],[1,3448,16.56,87],[1,2095,18.44,32],[1,976,3.5,50],[1,1337,7.73,34],[1,409,1.91,29],[1,7121,28.64,56],[1,977,4.07,55],[1,2499,8.66,64],[0,400001,3292.47,null],[1,6303,28.05,170],[1,1279,6.22,94],[1,8054,34.74,63],[1,64061,335.82,185],[1,935,5.49,101]],"iddfs":[[1,1177,3.89,10],[0,400001,712.63,null],[0,400001,937.98,null],[0,400001,950.83,null],[0,400001,703.82,null],[0,400001,675.06,null],[0,400001,704.89,null],[0,400001,783.03,null],[0,400001,721.88,null],[0,400001,909.25,null],[0,400001,701.59,null],[0,400001,768,null],[0,400001,728.98,null],[0,400001,774.08,null],[0,400001,745.15,null]],"astar":[[1,90,1.62,10],[1,23925,126.12,87],[1,1908,9.77,32],[1,2695,8.55,50],[1,65285,478.26,34],[1,58106,434.78,29],[1,40580,221.5,56],[0,400001,3476.93,null],[1,180229,1092.86,64],[0,400001,3885.71,null],[1,102620,550.65,170],[0,400001,2825.66,null],[1,76285,489.27,63],[0,400001,2615.18,null],[1,15019,60.15,101]],"astar-deadlock":[[1,90,1.43,10],[1,8857,50.37,87],[1,791,6.41,32],[1,1487,6.52,50],[1,6607,48.91,34],[1,6530,43.88,29],[1,10233,63.01,56],[1,128003,1078.58,55],[1,49642,331.54,64],[0,400001,4292.73,null],[1,10857,61.07,170],[1,61085,434.72,94],[1,4849,31.92,63],[1,178675,1263.7,185],[1,2872,11.77,101]],"idastar":[[1,272,2.69,10],[0,400001,1601.96,null],[1,82694,385.48,32],[0,400001,1198.86,null],[0,400001,1632.73,null],[0,400001,1586.2,null],[0,400001,1385.09,null],[0,400001,1925.1,null],[0,400001,1444.44,null],[0,400001,2430.33,null],[0,400001,1471.69,null],[0,400001,1607.13,null],[0,400001,1696.96,null],[0,400001,1531.43,null],[0,400001,1149.21,null]],"idastar-deadlock":[[1,272,2.76,10],[0,400001,1658.41,null],[1,31661,169.15,32],[0,400001,1328.68,null],[0,400001,1841.91,null],[0,400001,1797.9,null],[0,400001,1671.87,null],[0,400001,1989.91,null],[0,400001,1748.72,null],[0,400001,2646.57,null],[0,400001,1631.24,null],[0,400001,1690.77,null],[0,400001,1798.59,null],[0,400001,1931.23,null],[0,400001,1380.31,null]],"mcts":[[1,21,0.33,21],[0,400000,292.96,null],[0,400000,296.36,null],[0,400000,244.68,null],[0,400000,278.88,null],[0,400000,267.05,null],[0,400000,257.82,null],[0,400000,287.37,null],[0,400000,246.03,null],[0,400000,267.58,null],[0,400000,244.88,null],[0,400000,281.6,null],[0,400000,301.11,null],[0,400000,259.04,null],[0,400000,239.01,null]]};
+
+  // results[algoId][levelIndex] = { found, states, timeMs, length }
+  const results = {};
+  ALGORITHMS.forEach((a) => {
+    results[a.id] = (BENCHMARK_DATA[a.id] || []).map(([found, states, timeMs, length]) => ({
+      found: !!found, states, timeMs, length
+    }));
+  });
+
+  function fmt(n) { return n.toLocaleString(); }
+
+  function summarize(algoId) {
+    const rows = results[algoId] || [];
+    const solvedRows = rows.filter((r) => r.found);
+    const avgStates = solvedRows.length ? solvedRows.reduce((s, r) => s + r.states, 0) / solvedRows.length : null;
+    const avgTime = solvedRows.length ? solvedRows.reduce((s, r) => s + r.timeMs, 0) / solvedRows.length : null;
+    const avgLen = solvedRows.length ? solvedRows.reduce((s, r) => s + r.length, 0) / solvedRows.length : null;
+    return { solved: solvedRows.length, attempted: rows.length, avgStates, avgTime, avgLen };
+  }
+
+  function rankAlgorithms() {
+    return ALGORITHMS.map((a) => ({ algo: a, summary: summarize(a.id) }))
+      .sort((x, y) => {
+        if (y.summary.solved !== x.summary.solved) return y.summary.solved - x.summary.solved;
+        const xs = x.summary.avgStates ?? Infinity;
+        const ys = y.summary.avgStates ?? Infinity;
+        return xs - ys;
+      });
+  }
+
+  function renderBarChart(containerEl, rows, opts) {
+    // rows: [{ id, label, value, isWinner }], opts: { max, ticks, formatValue, scale }
+    const scale = opts.scale || ((v) => (v / opts.max) * 100);
+    containerEl.innerHTML = '';
+
+    const gridlines = document.createElement('div');
+    gridlines.className = 'gridlines';
+    opts.ticks.forEach((t) => {
+      const gl = document.createElement('div');
+      gl.className = 'gridline';
+      gl.style.left = scale(t.value) + '%';
+      const tick = document.createElement('div');
+      tick.className = 'tick';
+      tick.textContent = t.label;
+      gl.appendChild(tick);
+      gridlines.appendChild(gl);
+    });
+    containerEl.appendChild(gridlines);
+
+    const rowsEl = document.createElement('div');
+    rowsEl.className = 'rows';
+    rows.forEach((row) => {
+      const rowEl = document.createElement('div');
+      rowEl.className = 'bar-row' + (row.isWinner ? ' is-winner' : '');
+      const label = document.createElement('div');
+      label.className = 'bar-label';
+      label.textContent = row.label;
+      label.title = row.label;
+      const track = document.createElement('div');
+      track.className = 'bar-track';
+      const fill = document.createElement('div');
+      fill.className = 'bar-fill';
+      fill.style.width = Math.max(0, Math.min(100, scale(row.value))) + '%';
+      track.appendChild(fill);
+      const value = document.createElement('div');
+      value.className = 'bar-value';
+      value.textContent = opts.formatValue(row.value);
+      rowEl.appendChild(label);
+      rowEl.appendChild(track);
+      rowEl.appendChild(value);
+      rowsEl.appendChild(rowEl);
+    });
+    containerEl.appendChild(rowsEl);
+  }
+
+  function renderCharts() {
+    const ranked = rankAlgorithms();
+    const winnerEntry = ranked[0];
+    const winnerId = winnerEntry.algo.id;
+
+    document.getElementById('winnerName').textContent = winnerEntry.algo.label;
+    document.getElementById('winnerDetail').textContent =
+      `${winnerEntry.summary.solved}/${LEVELS.length} levels solved` +
+      (winnerEntry.summary.avgStates != null ? `, ${fmt(Math.round(winnerEntry.summary.avgStates))} avg states explored` : '');
+    document.getElementById('winnerNote').textContent = winnerId === BoxmanSolver.DEFAULT_ALGORITHM_ID
+      ? `This matches the game's built-in default solver.`
+      : `The game's built-in default is currently "${BoxmanSolver.getAlgorithm(BoxmanSolver.DEFAULT_ALGORITHM_ID).label}" — this run suggests it may be worth revisiting for this state budget.`;
+
+    // Levels-solved chart
+    const solvedRows = ranked.map(({ algo, summary }) => ({
+      id: algo.id, label: algo.label, value: summary.solved, isWinner: algo.id === winnerId
+    }));
+    renderBarChart(document.getElementById('solvedChart'), solvedRows, {
+      max: LEVELS.length,
+      ticks: [0, 5, 10, LEVELS.length].map((v) => ({ value: v, label: String(v) })),
+      formatValue: (v) => `${v} / ${LEVELS.length}`
+    });
+
+    // Avg states chart (log scale), only algorithms that solved at least one level
+    const withStates = ranked.filter((r) => r.summary.avgStates != null);
+    if (withStates.length) {
+      const values = withStates.map((r) => r.summary.avgStates);
+      const minV = Math.max(1, Math.min(...values));
+      const maxV = Math.max(...values);
+      const logMin = Math.log10(minV);
+      const logMax = Math.log10(Math.max(maxV, minV * 10));
+      const scale = (v) => ((Math.log10(Math.max(v, 1)) - logMin) / (logMax - logMin || 1)) * 100;
+      const ticks = [100, 1000, 10000, 100000, 1000000]
+        .filter((t) => t >= minV / 3 && t <= maxV * 3)
+        .map((t) => ({ value: t, label: t >= 1000 ? (t / 1000) + 'k' : String(t) }));
+      const statesRows = withStates
+        .sort((a, b) => a.summary.avgStates - b.summary.avgStates)
+        .map(({ algo, summary }) => ({
+          id: algo.id, label: algo.label, value: summary.avgStates, isWinner: algo.id === winnerId
+        }));
+      renderBarChart(document.getElementById('statesChart'), statesRows, {
+        scale, ticks, formatValue: (v) => fmt(Math.round(v))
+      });
+    } else {
+      document.getElementById('statesChartPanel').style.display = 'none';
+    }
+
+    renderMatrix(ranked, winnerId);
+  }
+
+  function renderMatrix(ranked, winnerId) {
+    const table = document.getElementById('matrixTable');
+    table.innerHTML = '';
+
+    const thead = document.createElement('thead');
+    const headRow = document.createElement('tr');
+    const cornerTh = document.createElement('th');
+    cornerTh.className = 'algo-col';
+    cornerTh.textContent = 'Algorithm';
+    headRow.appendChild(cornerTh);
+    for (let i = 0; i < LEVELS.length; i++) {
+      const th = document.createElement('th');
+      th.textContent = 'L' + (i + 1);
+      headRow.appendChild(th);
+    }
+    const summaryTh = document.createElement('th');
+    summaryTh.textContent = 'Solved';
+    headRow.appendChild(summaryTh);
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    ranked.forEach(({ algo, summary }) => {
+      const tr = document.createElement('tr');
+      if (algo.id === winnerId) tr.className = 'winner-row';
+      const nameTd = document.createElement('td');
+      nameTd.className = 'algo-name';
+      nameTd.textContent = algo.label;
+      tr.appendChild(nameTd);
+      for (let i = 0; i < LEVELS.length; i++) {
+        const cell = results[algo.id][i];
+        const td = document.createElement('td');
+        if (!cell) {
+          td.textContent = '';
+        } else if (cell.found) {
+          td.className = 'solved';
+          td.textContent = `${fmt(cell.states)} / ${cell.timeMs.toFixed(0)}ms`;
+        } else {
+          td.className = 'not-solved';
+          td.textContent = '—';
+        }
+        tr.appendChild(td);
+      }
+      const summaryTd = document.createElement('td');
+      summaryTd.className = 'summary-col';
+      summaryTd.textContent = `${summary.solved}/${LEVELS.length}`;
+      tr.appendChild(summaryTd);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+  }
+
+  renderCharts();
+})();
+</script>
+</body>
+</html>

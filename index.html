@@ -64,6 +64,15 @@
     color: var(--muted);
   }
   .hud .stat b { color: var(--text); }
+  .hud select {
+    background: var(--wall);
+    color: var(--text);
+    border: none;
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
   .hud button {
     background: var(--wall);
     color: var(--text);
@@ -205,6 +214,7 @@
     <div class="stat">Level <b id="levelNum">1</b> / <b id="levelTotal"></b></div>
     <div class="stat">Moves: <b id="moveCount">0</b></div>
     <div class="stat">Pushes: <b id="pushCount">0</b></div>
+    <select id="algorithmSelect" title="Solver algorithm"></select>
     <button id="undoBtn">Undo</button>
     <button id="resetBtn">Reset</button>
     <button id="solveBtn">Solve</button>
@@ -224,247 +234,20 @@
   <div class="levels" id="levelPicker"></div>
 
   <footer>
-    Move with <kbd>Arrow Keys</kbd> or <kbd>WASD</kbd>. Undo with <kbd>U</kbd> or <kbd>Backspace</kbd>. Reset with <kbd>R</kbd>. Stuck? Hit <kbd>Solve</kbd> — it searches for a solution from wherever you are and plays it out. Want to just watch? Hit <kbd>🏁 Speed Run</kbd> and the AI plays every level back to back.
+    Move with <kbd>Arrow Keys</kbd> or <kbd>WASD</kbd>. Undo with <kbd>U</kbd> or <kbd>Backspace</kbd>. Reset with <kbd>R</kbd>. Pick a solver from the dropdown, then hit <kbd>Solve</kbd> — it searches for a solution from wherever you are and plays it out. Want to just watch? Hit <kbd>🏁 Speed Run</kbd> and the AI plays every level back to back.
     <br /><br />
     <a href="how-it-works.html" style="color: var(--player);">Curious how the AI solver actually works?</a> ·
+    <a href="benchmark.html" style="color: var(--player);">Compare algorithms</a> ·
     <a href="level-editor.html" style="color: var(--muted);">Build your own levels</a>
   </footer>
 
+<script src="levels.js"></script>
+<script src="solver.js"></script>
 <script>
 (function () {
-  const LEVELS = [
-    // Level 1 - built and verified in the level editor
-    [
-      "###########",
-      "###########",
-      "####.######",
-      "#### ######",
-      "####$ $.###",
-      "##. $@#####",
-      "#####$#####",
-      "#####.#####",
-      "###########",
-      "###########",
-      "###########"
-    ],
-    // Level 2 - built and verified in the level editor
-    [
-      "###########",
-      "###########",
-      "##  @######",
-      "## $$######",
-      "## $ ###.##",
-      "#### ###.##",
-      "####    .##",
-      "###   #  ##",
-      "###   #####",
-      "###########",
-      "###########"
-    ],
-    // Level 3 - built and verified in the level editor
-    [
-      "###########",
-      "######    #",
-      "###  #    #",
-      "## @$#    #",
-      "###$ ##   #",
-      "### $ #   #",
-      "##.$  #   #",
-      "##..*.#   #",
-      "#######   #",
-      "###########",
-      "###########"
-    ],
-    // Level 4 - built and verified in the level editor
-    [
-      "###########",
-      "###########",
-      "###@ ######",
-      "### $  ####",
-      "#### # ####",
-      "##.# #  ###",
-      "##.$  # ###",
-      "##.   $ ###",
-      "###########",
-      "###########",
-      "###########"
-    ],
-    // Level 5 - built and verified in the level editor
-    [
-      "###########",
-      "###########",
-      "####    ###",
-      "####$$$ ###",
-      "##@ $.. ###",
-      "## $...####",
-      "#####  ####",
-      "###########",
-      "###########",
-      "###########",
-      "###########"
-    ],
-    // Level 6 - built and verified in the level editor
-    [
-      "###########",
-      "###########",
-      "####  @####",
-      "##  $. ####",
-      "##  .$. ###",
-      "#### *$ ###",
-      "####   ####",
-      "###########",
-      "###########",
-      "###########",
-      "###########"
-    ],
-    // Level 7 - built and verified in the level editor
-    [
-      "###########",
-      "###########",
-      "####..#####",
-      "#### .#####",
-      "###  $.####",
-      "### $  ####",
-      "##  #$$ ###",
-      "##  @   ###",
-      "###########",
-      "###########",
-      "###########"
-    ],
-    // Level 8 - built and verified in the level editor
-    [
-      "###########",
-      "###########",
-      "##  #   ###",
-      "## $..$ ###",
-      "##@$.* ####",
-      "## $..$ ###",
-      "##  #   ###",
-      "###########",
-      "###########",
-      "###########",
-      "###########"
-    ],
-    // Level 9 - built and verified in the level editor
-    [
-      "###########",
-      "###########",
-      "##    #####",
-      "## $$$#####",
-      "##  #..####",
-      "###  ..$ ##",
-      "### @    ##",
-      "###########",
-      "###########",
-      "###########",
-      "###########"
-    ],
-    // Level 10 - built and verified in the level editor
-    [
-      "###########",
-      "###########",
-      "##..$..####",
-      "##..#..####",
-      "## $$$ ####",
-      "##  $  ####",
-      "## $$$ ####",
-      "##  #@ ####",
-      "###########",
-      "###########",
-      "###########"
-    ],
-    // Level 11 - built and verified in the level editor
-    [
-      "###########",
-      "###########",
-      "### @ #####",
-      "### #$  ###",
-      "## *. . ###",
-      "##  $$ ####",
-      "#### #.####",
-      "####   ####",
-      "###########",
-      "###########",
-      "###########"
-    ],
-    // Level 12 - built and verified in the level editor
-    [
-      "###########",
-      "###########",
-      "##    #####",
-      "## $ @#####",
-      "###*  #####",
-      "## * ######",
-      "## * ######",
-      "## * ######",
-      "## . ######",
-      "###########",
-      "###########"
-    ],
-    // Level 13 - built and verified in the level editor
-    [
-      "###########",
-      "###########",
-      "####  #####",
-      "####$ #####",
-      "##  * @####",
-      "##  *  ####",
-      "##  * #####",
-      "####* #####",
-      "####.######",
-      "###########",
-      "###########"
-    ],
-    // Level 14 - built and verified in the level editor
-    [
-      "###########",
-      "###########",
-      "##   ######",
-      "## # #   ##",
-      "## $   $ ##",
-      "##..#$#$###",
-      "##.@$   ###",
-      "##..  #####",
-      "###########",
-      "###########",
-      "###########"
-    ],
-    // Level 15 - built and verified in the level editor
-    [
-      "###########",
-      "###########",
-      "###    ####",
-      "###.##$ ###",
-      "## ..$  ###",
-      "##  #$  ###",
-      "##  @ #####",
-      "###########",
-      "###########",
-      "###########",
-      "###########"
-    ]
-  ];
-
-  // Precomputed winning move-sequences (U/D/L/R) for each level's initial state,
-  // generated offline since a couple of these need a search far too deep to run live in-browser.
-  // Speed Run replays these directly instead of solving from scratch.
-  const SOLUTIONS = [
-    "DULLRUUDRR",
-    "DDDDRDDLLURDRULUUUUULLDRURDDDDRRRDRUUDLLLDDLLURDRULUUUULLDRURDDDRRRDRULLLDDLLURDRULURRR",
-    "DRDRDDLLRRUULDLDRUUULDDUUUURDDDD",
-    "RDRRDDRDDLLULLDLURRRDLLRRRRUULUULLDDUURRDDRDDLLULL",
-    "DRRRURRUULLDDLDLLURRRUURRDLULDULDD",
-    "DLLDLLURRDDDRRUULLULLDRURURRD",
-    "LUURRUUDDLLDDRRUUDDRRULDLLLUURRURDLLLDDRRUURULDDDRUULLUU",
-    "URLDDRURRDLRDRRULLUUURRDLDLDDRRULULLLLUURDLDRRLLDDRULUR",
-    "ULULUURRRDDRDLUUULLDRURDDRDDRRULDLUDLUDLLURRLLULURURRDDUULLDRURD",
-    "RUULURUULLLDLDDRUUDDLDDRUUURRUDDRUUDDDDLUUUDDLUDLDLUUURRRDRU",
-    "RDRDDDDLLUULUDRDDRRUULRUULDLDLLURRRURRDLDLLURDRULLLLDRRURRDDDLLUURUUULLDDLDRRLUUURRDDRRULDLLDDDRRUUDDLLUURLLLURUURRDDLDLURRURRDLLLDDDRRUUDDLLUURUURRDLDLLURDLLLURDRRUUULLD",
-    "DLDDDDLLUUURLDDDRRUUULLDRDUURURUULDULLDRDDUUURRDLRDLDLLDDRRUULDURURUULDULLDRDDUUURRDLULDDURRDL",
-    "DLDLDURUULDLLURRDRDDLURULULLDDRLUURRDDURRULLRUULDDRDDLLLUURDLDR",
-    "DRRULDLULUUUURRDDLDDLDRUUURRRURRDLLLLUULLDDDRDRRRRUDLLLLULUUURRDDRDURURRDLDDLLUURURDLLLUULLDDDRDDLUUURRRDDLRUULLDLDDRURRUURURRDLLLLUULLDDDDRRRDLURRRUDLLUULLRUULLDDDURRRRURRDLLLLLRUULLDD",
-    "LUUUURRRDDLLRRUULLLDDLDDRRRUDLLLUURRRLLUURRRDRDDLULLLLDDRRRURULDDLLLUURUURRRDRDDLLDLLUUDDRRUULRDRRULL"
-  ];
+  const LEVELS = window.BOXMAN_LEVELS;
+  const SOLUTIONS = window.BOXMAN_SOLUTIONS;
+  const LIVE_SOLVE_MAX_STATES = 700000;
 
   const boardEl = document.getElementById('board');
   const messageEl = document.getElementById('message');
@@ -643,74 +426,35 @@
     loadLevel(currentLevel);
   }
 
-  // BFS solver: searches (player position, box positions) states from the
-  // CURRENT board (not just the level start), so "Solve" also works as a
-  // hint after the player has already made some moves.
-  function findSolution(maxStates = 300000) {
-    const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
-    const boxSetKey = (set) => [...set].sort().join('|');
-    const isWinBoxes = (boxSet) => {
-      for (const t of targets) if (!boxSet.has(t)) return false;
-      return true;
-    };
+  // Solver algorithm picker — options and implementations come from the
+  // shared solver.js so index.html, level-editor.html, and benchmark.html
+  // all compare/select from the exact same registry.
+  const algorithmSelect = document.getElementById('algorithmSelect');
+  BoxmanSolver.ALGORITHMS.forEach((algo) => {
+    const opt = document.createElement('option');
+    opt.value = algo.id;
+    opt.textContent = algo.label;
+    algorithmSelect.appendChild(opt);
+  });
+  algorithmSelect.value = localStorage.getItem('boxman-algorithm') || BoxmanSolver.DEFAULT_ALGORITHM_ID;
+  algorithmSelect.addEventListener('change', () => {
+    localStorage.setItem('boxman-algorithm', algorithmSelect.value);
+  });
 
-    const startPlayerKey = key(player.r, player.c);
-    const startState = startPlayerKey + '/' + boxSetKey(boxes);
-    if (isWinBoxes(boxes)) return [];
+  let lastSolveStats = null;
 
-    const cameFrom = new Map();
-    const seen = new Set([startState]);
-    let frontier = [{ playerKey: startPlayerKey, boxes: new Set(boxes), state: startState }];
-    let explored = 0;
-
-    while (frontier.length) {
-      const next = [];
-      for (const cur of frontier) {
-        explored++;
-        if (explored > maxStates) return null;
-        const [pr, pc] = cur.playerKey.split(',').map(Number);
-        for (const [dr, dc] of dirs) {
-          const nr = pr + dr, nc = pc + dc;
-          const nk = key(nr, nc);
-          if (isWall(nr, nc)) continue;
-
-          let newBoxes = cur.boxes;
-          if (cur.boxes.has(nk)) {
-            const br = nr + dr, bc = nc + dc;
-            const bk = key(br, bc);
-            if (isWall(br, bc) || cur.boxes.has(bk)) continue;
-            newBoxes = new Set(cur.boxes);
-            newBoxes.delete(nk);
-            newBoxes.add(bk);
-          }
-
-          const nstate = nk + '/' + boxSetKey(newBoxes);
-          if (seen.has(nstate)) continue;
-          seen.add(nstate);
-          cameFrom.set(nstate, { prev: cur.state, dr, dc });
-
-          if (isWinBoxes(newBoxes)) {
-            const path = [];
-            let s = nstate;
-            while (s !== startState) {
-              const info = cameFrom.get(s);
-              path.push({ dr: info.dr, dc: info.dc });
-              s = info.prev;
-            }
-            path.reverse();
-            return path;
-          }
-
-          next.push({ playerKey: nk, boxes: newBoxes, state: nstate });
-        }
-      }
-      frontier = next;
-    }
-    return null;
+  // Runs the selected algorithm against the CURRENT board (not just the
+  // level start), so "Solve" also works as a hint after the player has
+  // already made some moves.
+  function findSolution(maxStates = LIVE_SOLVE_MAX_STATES) {
+    const algo = BoxmanSolver.getAlgorithm(algorithmSelect.value);
+    const result = algo.run({ grid, targets, player, boxes, maxStates });
+    lastSolveStats = { algoLabel: algo.label, statesExplored: result.statesExplored, timeMs: result.timeMs };
+    return result.found ? result.path : null;
   }
 
   function setControlsDisabled(disabled) {
-    document.querySelectorAll('.controls button, .hud button:not(#speedRunBtn), .levels button')
+    document.querySelectorAll('.controls button, .hud button:not(#speedRunBtn), .hud select, .levels button')
       .forEach((b) => { b.disabled = disabled; });
   }
 
@@ -731,18 +475,23 @@
     return boxesMatch && initialPlayer.r === player.r && initialPlayer.c === player.c;
   }
 
-  // A couple of levels need a search far too deep to run live in the browser, so when
-  // the board is untouched we replay the precomputed SOLUTIONS entry instead of
-  // searching from scratch. Once the player has actually moved something, we fall back
-  // to the live BFS below (which is fine for the shorter re-plans that implies).
+  // Always tries the selected algorithm live first. A couple of levels are
+  // hard enough that a weaker algorithm (plain BFS, IDDFS, IDA*, MCTS) can
+  // burn through its whole state budget without finding anything — when
+  // that happens and the board is still untouched, fall back to replaying
+  // the precomputed SOLUTIONS entry so Solve/Speed Run never just stalls.
   function getSolutionMoves() {
+    const solution = findSolution();
+    if (solution) return solution;
+
     if (SOLUTIONS[currentLevel] && isAtLevelStart()) {
+      lastSolveStats = { ...lastSolveStats, fallback: true };
       return [...SOLUTIONS[currentLevel]].map((ch) => {
         const [dr, dc] = DIR_DELTA[ch];
         return { dr, dc };
       });
     }
-    return findSolution();
+    return null;
   }
 
   function runSolver() {
@@ -755,11 +504,12 @@
       ? `Speed run — Level ${currentLevel + 1}/${LEVELS.length}: searching…`
       : 'Searching for a solution…';
 
-    // Defer so the "Searching…" message paints before the (synchronous) BFS runs.
+    // Defer so the "Searching…" message paints before the (synchronous) search runs.
     setTimeout(() => {
       const solution = getSolutionMoves();
       if (!solution) {
-        messageEl.textContent = "No solution found from here (state limit reached) — try Reset.";
+        messageEl.textContent = `No solution found from here with ${lastSolveStats.algoLabel} `
+          + `(explored ${lastSolveStats.statesExplored.toLocaleString()} states) — try Reset or a different algorithm.`;
         solving = false;
         if (speedRunning) stopSpeedRun(); else { setControlsDisabled(false); solveBtn.textContent = 'Solve'; }
         return;
@@ -771,9 +521,12 @@
         return;
       }
 
+      const statsNote = lastSolveStats.fallback
+        ? `${lastSolveStats.algoLabel} didn't finish in time, replayed a precomputed solution`
+        : `${lastSolveStats.algoLabel}: ${lastSolveStats.statesExplored.toLocaleString()} states in ${lastSolveStats.timeMs.toFixed(0)}ms`;
       messageEl.textContent = speedRunning
-        ? `Speed run — Level ${currentLevel + 1}/${LEVELS.length}: solving in ${solution.length} moves…`
-        : `Solving in ${solution.length} moves…`;
+        ? `Speed run — Level ${currentLevel + 1}/${LEVELS.length}: solving in ${solution.length} moves (${statsNote})…`
+        : `Solving in ${solution.length} moves (${statsNote})…`;
       let i = 0;
       const stepTimer = setInterval(() => {
         if (i >= solution.length) {

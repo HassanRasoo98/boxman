@@ -196,6 +196,7 @@
   <nav style="display:flex; gap:16px; font-size:0.9rem; margin-bottom:8px;">
     <a href="index.html" style="color:var(--muted); text-decoration:none;">← Play Boxman</a>
     <a href="how-it-works.html" style="color:var(--muted); text-decoration:none;">How the solver works</a>
+    <a href="benchmark.html" style="color:var(--muted); text-decoration:none;">Compare algorithms</a>
   </nav>
   <h1>BOXMAN <span>LEVEL EDITOR</span></h1>
   <div class="subtitle">Paint walls, trees, floor, targets, boxes and the player. Test-play before exporting so every level you hand off is guaranteed solvable.</div>
@@ -283,6 +284,7 @@
         <button id="testRight">&rarr;</button>
       </div>
       <div class="row">
+        <select id="testAlgorithmSelect" title="Solver algorithm"></select>
         <button id="testUndoBtn">Undo</button>
         <button id="testResetBtn">Reset</button>
         <button id="testSolveBtn">Auto-Solve</button>
@@ -292,6 +294,7 @@
     </div>
   </div>
 
+<script src="solver.js"></script>
 <script>
 (function () {
   const STORAGE_KEY = 'boxman-editor-levels-v2';
@@ -808,52 +811,27 @@
 
   function tReset() { if (tSolving) return; openTestPlay(); }
 
-  function tFindSolution(maxStates = 300000) {
-    const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
-    const boxSetKey = (set) => [...set].sort().join('|');
-    const isWinBoxes = (boxSet) => { for (const t of tTargets) if (!boxSet.has(t)) return false; return true; };
-    const startPlayerKey = tKey(tPlayer.r, tPlayer.c);
-    const startState = startPlayerKey + '/' + boxSetKey(tBoxes);
-    if (isWinBoxes(tBoxes)) return [];
-    const cameFrom = new Map();
-    const seen = new Set([startState]);
-    let frontier = [{ playerKey: startPlayerKey, boxes: new Set(tBoxes), state: startState }];
-    let explored = 0;
-    while (frontier.length) {
-      const next = [];
-      for (const cur of frontier) {
-        explored++;
-        if (explored > maxStates) return null;
-        const [pr, pc] = cur.playerKey.split(',').map(Number);
-        for (const [dr, dc] of dirs) {
-          const nr = pr + dr, nc = pc + dc, nk = tKey(nr, nc);
-          if (tIsWall(nr, nc)) continue;
-          let newBoxes = cur.boxes;
-          if (cur.boxes.has(nk)) {
-            const br = nr + dr, bc = nc + dc, bk = tKey(br, bc);
-            if (tIsWall(br, bc) || cur.boxes.has(bk)) continue;
-            newBoxes = new Set(cur.boxes); newBoxes.delete(nk); newBoxes.add(bk);
-          }
-          const nstate = nk + '/' + boxSetKey(newBoxes);
-          if (seen.has(nstate)) continue;
-          seen.add(nstate);
-          cameFrom.set(nstate, { prev: cur.state, dr, dc });
-          if (isWinBoxes(newBoxes)) {
-            const path = []; let s = nstate;
-            while (s !== startState) { const info = cameFrom.get(s); path.push({ dr: info.dr, dc: info.dc }); s = info.prev; }
-            path.reverse();
-            return path;
-          }
-          next.push({ playerKey: nk, boxes: newBoxes, state: nstate });
-        }
-      }
-      frontier = next;
-    }
-    return null;
+  // Solver algorithm picker, shared with index.html/benchmark.html via solver.js.
+  const testAlgorithmSelect = document.getElementById('testAlgorithmSelect');
+  BoxmanSolver.ALGORITHMS.forEach((algo) => {
+    const opt = document.createElement('option');
+    opt.value = algo.id;
+    opt.textContent = algo.label;
+    testAlgorithmSelect.appendChild(opt);
+  });
+  testAlgorithmSelect.value = localStorage.getItem('boxman-algorithm') || BoxmanSolver.DEFAULT_ALGORITHM_ID;
+  testAlgorithmSelect.addEventListener('change', () => {
+    localStorage.setItem('boxman-algorithm', testAlgorithmSelect.value);
+  });
+
+  function tFindSolution(maxStates = 700000) {
+    const algo = BoxmanSolver.getAlgorithm(testAlgorithmSelect.value);
+    const result = algo.run({ grid: tGrid, targets: tTargets, player: tPlayer, boxes: tBoxes, maxStates });
+    return { path: result.found ? result.path : null, algoLabel: algo.label, statesExplored: result.statesExplored, timeMs: result.timeMs };
   }
 
   function tSetControlsDisabled(disabled) {
-    document.querySelectorAll('#testModal .controls-pad button, #testModal .row button').forEach(b => b.disabled = disabled);
+    document.querySelectorAll('#testModal .controls-pad button, #testModal .row button, #testModal .row select').forEach(b => b.disabled = disabled);
   }
 
   function tRunSolver() {
@@ -863,9 +841,10 @@
     solveBtn.textContent = 'Thinking…';
     testMessageEl.textContent = 'Searching for a solution…';
     setTimeout(() => {
-      const solution = tFindSolution();
+      const { path: solution, algoLabel, statesExplored, timeMs } = tFindSolution();
       if (!solution) {
-        testMessageEl.textContent = 'No solution found (state limit reached). This level may be unsolvable as drawn — check box/wall placement.';
+        testMessageEl.textContent = `No solution found with ${algoLabel} (explored ${statesExplored.toLocaleString()} states). `
+          + `This level may be unsolvable as drawn, or just need a stronger algorithm — check box/wall placement or try a different one.`;
         tSolving = false; tSetControlsDisabled(false); solveBtn.textContent = 'Auto-Solve';
         return;
       }
@@ -874,7 +853,7 @@
         tSolving = false; tSetControlsDisabled(false); solveBtn.textContent = 'Auto-Solve';
         return;
       }
-      testMessageEl.textContent = `Solvable in ${solution.length} moves — playing it out…`;
+      testMessageEl.textContent = `Solvable in ${solution.length} moves — ${algoLabel} explored ${statesExplored.toLocaleString()} states in ${timeMs.toFixed(0)}ms — playing it out…`;
       let i = 0;
       const timer = setInterval(() => {
         if (i >= solution.length) {
