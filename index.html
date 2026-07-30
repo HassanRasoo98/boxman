@@ -208,6 +208,7 @@
     <button id="undoBtn">Undo</button>
     <button id="resetBtn">Reset</button>
     <button id="solveBtn">Solve</button>
+    <button id="speedRunBtn">🏁 Speed Run</button>
   </div>
 
   <div id="board"></div>
@@ -223,59 +224,222 @@
   <div class="levels" id="levelPicker"></div>
 
   <footer>
-    Move with <kbd>Arrow Keys</kbd> or <kbd>WASD</kbd>. Undo with <kbd>U</kbd> or <kbd>Backspace</kbd>. Reset with <kbd>R</kbd>. Stuck? Hit <kbd>Solve</kbd> — it searches for a solution from wherever you are and plays it out.
+    Move with <kbd>Arrow Keys</kbd> or <kbd>WASD</kbd>. Undo with <kbd>U</kbd> or <kbd>Backspace</kbd>. Reset with <kbd>R</kbd>. Stuck? Hit <kbd>Solve</kbd> — it searches for a solution from wherever you are and plays it out. Want to just watch? Hit <kbd>🏁 Speed Run</kbd> and the AI plays every level back to back.
   </footer>
 
 <script>
 (function () {
   const LEVELS = [
-    ["######",
-     "#    #",
-     "# $. #",
-     "#  @ #",
-     "#    #",
-     "######"],
-    ["#######",
-     "#     #",
-     "# $ $ #",
-     "# . . #",
-     "#  @  #",
-     "#     #",
-     "#######"],
-    ["#########",
-     "#       #",
-     "#  $    #",
-     "#       #",
-     "#    .  #",
-     "#       #",
-     "#  @    #",
-     "#########"],
-    ["#########",
-     "#   #   #",
-     "# $   $ #",
-     "#   #   #",
-     "# . # . #",
-     "#   @   #",
-     "#   #   #",
-     "#########"],
-    ["###########",
-     "#         #",
-     "# $     $ #",
-     "#   ###   #",
-     "#    @    #",
-     "#   ###   #",
-     "# .     . #",
-     "#         #",
-     "###########"],
-    ["#########",
-     "#       #",
-     "# $   $ #",
-     "#       #",
-     "#   @   #",
-     "#       #",
-     "# .   . #",
-     "#       #",
-     "#########"],
+    // Level 1 - built and verified in the level editor
+    [
+      "###########",
+      "###########",
+      "####.######",
+      "#### ######",
+      "####$ $.###",
+      "##. $@#####",
+      "#####$#####",
+      "#####.#####",
+      "###########",
+      "###########",
+      "###########"
+    ],
+    // Level 2 - built and verified in the level editor
+    [
+      "###########",
+      "###########",
+      "##  @######",
+      "## $$######",
+      "## $ ###.##",
+      "#### ###.##",
+      "####    .##",
+      "###   #  ##",
+      "###   #####",
+      "###########",
+      "###########"
+    ],
+    // Level 3 - built and verified in the level editor
+    [
+      "###########",
+      "######    #",
+      "###  #    #",
+      "## @$#    #",
+      "###$ ##   #",
+      "### $ #   #",
+      "##.$  #   #",
+      "##..*.#   #",
+      "#######   #",
+      "###########",
+      "###########"
+    ],
+    // Level 4 - built and verified in the level editor
+    [
+      "###########",
+      "###########",
+      "###@ ######",
+      "### $  ####",
+      "#### # ####",
+      "##.# #  ###",
+      "##.$  # ###",
+      "##.   $ ###",
+      "###########",
+      "###########",
+      "###########"
+    ],
+    // Level 5 - built and verified in the level editor
+    [
+      "###########",
+      "###########",
+      "####    ###",
+      "####$$$ ###",
+      "##@ $.. ###",
+      "## $...####",
+      "#####  ####",
+      "###########",
+      "###########",
+      "###########",
+      "###########"
+    ],
+    // Level 6 - built and verified in the level editor
+    [
+      "###########",
+      "###########",
+      "####  @####",
+      "##  $. ####",
+      "##  .$. ###",
+      "#### *$ ###",
+      "####   ####",
+      "###########",
+      "###########",
+      "###########",
+      "###########"
+    ],
+    // Level 7 - built and verified in the level editor
+    [
+      "###########",
+      "###########",
+      "####..#####",
+      "#### .#####",
+      "###  $.####",
+      "### $  ####",
+      "##  #$$ ###",
+      "##  @   ###",
+      "###########",
+      "###########",
+      "###########"
+    ],
+    // Level 8 - built and verified in the level editor
+    [
+      "###########",
+      "###########",
+      "##  #   ###",
+      "## $..$ ###",
+      "##@$.* ####",
+      "## $..$ ###",
+      "##  #   ###",
+      "###########",
+      "###########",
+      "###########",
+      "###########"
+    ],
+    // Level 9 - built and verified in the level editor
+    [
+      "###########",
+      "###########",
+      "##    #####",
+      "## $$$#####",
+      "##  #..####",
+      "###  ..$ ##",
+      "### @    ##",
+      "###########",
+      "###########",
+      "###########",
+      "###########"
+    ],
+    // Level 10 - built and verified in the level editor
+    [
+      "###########",
+      "###########",
+      "##..$..####",
+      "##..#..####",
+      "## $$$ ####",
+      "##  $  ####",
+      "## $$$ ####",
+      "##  #@ ####",
+      "###########",
+      "###########",
+      "###########"
+    ],
+    // Level 11 - built and verified in the level editor
+    [
+      "###########",
+      "###########",
+      "### @ #####",
+      "### #$  ###",
+      "## *. . ###",
+      "##  $$ ####",
+      "#### #.####",
+      "####   ####",
+      "###########",
+      "###########",
+      "###########"
+    ],
+    // Level 12 - built and verified in the level editor
+    [
+      "###########",
+      "###########",
+      "##    #####",
+      "## $ @#####",
+      "###*  #####",
+      "## * ######",
+      "## * ######",
+      "## * ######",
+      "## . ######",
+      "###########",
+      "###########"
+    ],
+    // Level 13 - built and verified in the level editor
+    [
+      "###########",
+      "###########",
+      "####  #####",
+      "####$ #####",
+      "##  * @####",
+      "##  *  ####",
+      "##  * #####",
+      "####* #####",
+      "####.######",
+      "###########",
+      "###########"
+    ],
+    // Level 14 - built and verified in the level editor
+    [
+      "###########",
+      "###########",
+      "##   ######",
+      "## # #   ##",
+      "## $   $ ##",
+      "##..#$#$###",
+      "##.@$   ###",
+      "##..  #####",
+      "###########",
+      "###########",
+      "###########"
+    ],
+    // Level 15 - built and verified in the level editor
+    [
+      "###########",
+      "###########",
+      "###    ####",
+      "###.##$ ###",
+      "## ..$  ###",
+      "##  #$  ###",
+      "##  @ #####",
+      "###########",
+      "###########",
+      "###########",
+      "###########"
+    ]
   ];
 
   const boardEl = document.getElementById('board');
@@ -297,6 +461,7 @@
   let pushes = 0;
   let history = [];
   let solving = false;
+  let speedRunning = false;
   let autoAdvanceTimer = null;
   const cleared = new Set(JSON.parse(localStorage.getItem('boxman-cleared') || '[]'));
 
@@ -415,7 +580,14 @@
       localStorage.setItem('boxman-cleared', JSON.stringify([...cleared]));
       renderLevelPicker();
       if (currentLevel < LEVELS.length - 1) {
-        autoAdvanceTimer = setTimeout(() => { autoAdvanceTimer = null; loadLevel(currentLevel + 1); }, 1400);
+        autoAdvanceTimer = setTimeout(() => {
+          autoAdvanceTimer = null;
+          loadLevel(currentLevel + 1);
+          if (speedRunning) runSolver();
+        }, speedRunning ? 700 : 1400);
+      } else if (speedRunning) {
+        messageEl.textContent = `Speed run complete! All ${LEVELS.length} levels solved. 🏁`;
+        stopSpeedRun();
       } else {
         messageEl.textContent += ' You beat all levels! 🎉';
       }
@@ -423,12 +595,12 @@
   }
 
   function attemptMove(dr, dc) {
-    if (solving) return;
+    if (solving || speedRunning) return;
     doMove(dr, dc);
   }
 
   function undo() {
-    if (solving) return;
+    if (solving || speedRunning) return;
     const last = history.pop();
     if (!last) return;
     player = last.player;
@@ -443,7 +615,7 @@
   }
 
   function reset() {
-    if (solving) return;
+    if (solving || speedRunning) return;
     loadLevel(currentLevel);
   }
 
@@ -514,7 +686,7 @@
   }
 
   function setControlsDisabled(disabled) {
-    document.querySelectorAll('.controls button, .hud button, .levels button')
+    document.querySelectorAll('.controls button, .hud button:not(#speedRunBtn), .levels button')
       .forEach((b) => { b.disabled = disabled; });
   }
 
@@ -524,7 +696,9 @@
     setControlsDisabled(true);
     const solveBtn = document.getElementById('solveBtn');
     solveBtn.textContent = 'Thinking…';
-    messageEl.textContent = 'Searching for a solution…';
+    messageEl.textContent = speedRunning
+      ? `Speed run — Level ${currentLevel + 1}/${LEVELS.length}: searching…`
+      : 'Searching for a solution…';
 
     // Defer so the "Searching…" message paints before the (synchronous) BFS runs.
     setTimeout(() => {
@@ -532,45 +706,67 @@
       if (!solution) {
         messageEl.textContent = "No solution found from here (state limit reached) — try Reset.";
         solving = false;
-        setControlsDisabled(false);
-        solveBtn.textContent = 'Solve';
+        if (speedRunning) stopSpeedRun(); else { setControlsDisabled(false); solveBtn.textContent = 'Solve'; }
         return;
       }
       if (solution.length === 0) {
         messageEl.textContent = 'Already solved!';
         solving = false;
-        setControlsDisabled(false);
-        solveBtn.textContent = 'Solve';
+        if (speedRunning) stopSpeedRun(); else { setControlsDisabled(false); solveBtn.textContent = 'Solve'; }
         return;
       }
 
-      messageEl.textContent = `Solving in ${solution.length} moves…`;
+      messageEl.textContent = speedRunning
+        ? `Speed run — Level ${currentLevel + 1}/${LEVELS.length}: solving in ${solution.length} moves…`
+        : `Solving in ${solution.length} moves…`;
       let i = 0;
       const stepTimer = setInterval(() => {
         if (i >= solution.length) {
           clearInterval(stepTimer);
           solving = false;
-          setControlsDisabled(false);
-          solveBtn.textContent = 'Solve';
+          if (!speedRunning) { setControlsDisabled(false); solveBtn.textContent = 'Solve'; }
           return;
         }
         const { dr, dc } = solution[i];
         doMove(dr, dc);
         i++;
-      }, 180);
+      }, speedRunning ? 90 : 180);
     }, 50);
+  }
+
+  function startSpeedRun() {
+    if (speedRunning) return;
+    speedRunning = true;
+    document.getElementById('speedRunBtn').textContent = '⏹ Stop Speed Run';
+    loadLevel(0);
+    runSolver();
+  }
+
+  function stopSpeedRun() {
+    speedRunning = false;
+    document.getElementById('speedRunBtn').textContent = '🏁 Speed Run';
+    if (autoAdvanceTimer) { clearTimeout(autoAdvanceTimer); autoAdvanceTimer = null; }
+    if (!solving) {
+      setControlsDisabled(false);
+      document.getElementById('solveBtn').textContent = 'Solve';
+    }
+  }
+
+  function toggleSpeedRun() {
+    if (speedRunning) stopSpeedRun(); else startSpeedRun();
   }
 
   document.getElementById('undoBtn').addEventListener('click', undo);
   document.getElementById('resetBtn').addEventListener('click', reset);
   document.getElementById('solveBtn').addEventListener('click', runSolver);
+  document.getElementById('speedRunBtn').addEventListener('click', toggleSpeedRun);
   document.getElementById('up').addEventListener('click', () => attemptMove(-1, 0));
   document.getElementById('down').addEventListener('click', () => attemptMove(1, 0));
   document.getElementById('left').addEventListener('click', () => attemptMove(0, -1));
   document.getElementById('right').addEventListener('click', () => attemptMove(0, 1));
 
   window.addEventListener('keydown', (e) => {
-    if (solving) return;
+    if (solving || speedRunning) return;
     switch (e.key) {
       case 'ArrowUp': case 'w': case 'W': attemptMove(-1, 0); e.preventDefault(); break;
       case 'ArrowDown': case 's': case 'S': attemptMove(1, 0); e.preventDefault(); break;

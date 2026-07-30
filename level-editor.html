@@ -1,0 +1,914 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Boxman Level Editor</title>
+<style>
+  :root {
+    --bg: #1e1e2e;
+    --panel: #262638;
+    --panel2: #2f2f45;
+    --wall: #45475a;
+    --wall-edge: #313244;
+    --tree: #1c3a2e;
+    --tree-edge: #0f2a20;
+    --tree-icon: #4ec97a;
+    --floor: #11111b;
+    --target: #313244;
+    --target-dot: #f9e2af;
+    --box: #cba6f7;
+    --box-edge: #a97ff0;
+    --box-done: #a6e3a1;
+    --box-done-edge: #7fd07a;
+    --player: #89b4fa;
+    --player-edge: #5f8fdb;
+    --text: #cdd6f4;
+    --muted: #9399b2;
+    --accent: #f38ba8;
+    --good: #a6e3a1;
+    --bad: #f38ba8;
+    --cell: 40px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    min-height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 14px 60px;
+    gap: 14px;
+  }
+  h1 { margin: 0; font-size: 1.6rem; letter-spacing: 1px; }
+  h1 span { color: var(--accent); }
+  .subtitle { color: var(--muted); margin-top: -10px; font-size: 0.85rem; text-align: center; max-width: 640px; }
+  .layout {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+    max-width: 1300px;
+  }
+  .panel {
+    background: var(--panel);
+    border-radius: 12px;
+    padding: 14px;
+  }
+  .panel h2 {
+    margin: 0 0 10px;
+    font-size: 0.95rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  /* ---- level list ---- */
+  #levelListPanel { width: 190px; flex-shrink: 0; }
+  #levelList { display: flex; flex-direction: column; gap: 6px; max-height: 420px; overflow-y: auto; }
+  .level-tab {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--panel2); border-radius: 8px; padding: 8px 10px;
+    cursor: pointer; border: 2px solid transparent; font-size: 0.85rem;
+  }
+  .level-tab.active { border-color: var(--accent); color: var(--text); }
+  .level-tab:not(.active) { color: var(--muted); }
+  .level-tab .badge {
+    font-size: 0.7rem; padding: 1px 6px; border-radius: 6px;
+  }
+  .level-tab .badge.ok { background: rgba(166,227,161,0.2); color: var(--good); }
+  .level-tab .badge.bad { background: rgba(243,139,168,0.2); color: var(--bad); }
+  .level-actions { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .level-actions button { flex: 1; min-width: 60px; }
+
+  /* ---- toolbar ---- */
+  #toolPanel { width: 190px; flex-shrink: 0; }
+  .tool-btn {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    background: var(--panel2); color: var(--text); border: 2px solid transparent;
+    padding: 8px 10px; border-radius: 8px; cursor: pointer; margin-bottom: 6px;
+    font-size: 0.85rem; text-align: left;
+  }
+  .tool-btn.active { border-color: var(--accent); background: #3a3a55; }
+  .tool-swatch {
+    width: 22px; height: 22px; border-radius: 4px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; position: relative;
+  }
+  .swatch-wall { background: linear-gradient(145deg, var(--wall), #383a4d); }
+  .swatch-tree { background: var(--tree); }
+  .swatch-tree::after { content: "T"; color: var(--tree-icon); font-size: 11px; font-weight: 700; }
+  .swatch-floor { background: var(--floor); border: 1px solid #333; }
+  .swatch-target { background: var(--target); }
+  .swatch-target::after { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--target-dot); }
+  .swatch-box { background: var(--floor); }
+  .swatch-box::after { content: ""; width: 70%; height: 70%; background: var(--box); border: 2px solid var(--box-edge); border-radius: 3px; }
+  .swatch-player { background: var(--floor); }
+  .swatch-player::after { content: ""; width: 60%; height: 60%; background: var(--player); border: 2px solid var(--player-edge); border-radius: 50%; }
+  .swatch-eraser { background: var(--floor); border: 1px dashed var(--muted); }
+
+  kbd {
+    background: var(--wall); border-radius: 4px; padding: 0 5px; font-family: inherit; font-size: 0.75rem;
+  }
+
+  /* ---- grid area ---- */
+  #gridPanel { flex: 1; min-width: 320px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .grid-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center; font-size: 0.85rem; color: var(--muted); }
+  .grid-controls input[type=number] { width: 55px; background: var(--panel2); color: var(--text); border: 1px solid #444; border-radius: 6px; padding: 4px 6px; }
+  #board {
+    display: grid;
+    gap: 2px;
+    background: var(--wall-edge);
+    padding: 6px;
+    border-radius: 10px;
+    user-select: none;
+    touch-action: none;
+  }
+  .cell {
+    width: var(--cell); height: var(--cell);
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 4px; position: relative; cursor: pointer;
+  }
+  .cell.wall { background: linear-gradient(145deg, var(--wall), #383a4d); }
+  .cell.tree { background: var(--tree); }
+  .cell.tree::after { content: "\1F332"; font-size: calc(var(--cell) * 0.6); filter: saturate(1.3); }
+  .cell.floor { background: var(--floor); }
+  .cell.target { background: var(--target); }
+  .cell.target .dot { width: 22%; height: 22%; border-radius: 50%; background: var(--target-dot); box-shadow: 0 0 6px var(--target-dot); }
+  .cell .box { width: 78%; height: 78%; background: var(--box); border: 3px solid var(--box-edge); border-radius: 6px; position: absolute; }
+  .cell .box.done { background: var(--box-done); border-color: var(--box-done-edge); }
+  .cell .player { width: 62%; height: 62%; background: var(--player); border: 3px solid var(--player-edge); border-radius: 50%; position: absolute; z-index: 2; }
+
+  .stats { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; font-size: 0.85rem; }
+  .stat { background: var(--panel2); padding: 6px 12px; border-radius: 8px; color: var(--muted); }
+  .stat b { color: var(--text); }
+  .stat.ok b { color: var(--good); }
+  .stat.bad b { color: var(--bad); }
+
+  .row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  button {
+    background: var(--wall); color: var(--text); border: none;
+    padding: 7px 12px; border-radius: 8px; cursor: pointer; font-size: 0.85rem;
+  }
+  button:hover { background: var(--box-edge); }
+  button:active { transform: translateY(1px); }
+  button.primary { background: var(--accent); color: #2a2a3a; font-weight: 600; }
+  button.primary:hover { filter: brightness(1.1); background: var(--accent); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ---- export / test panels ---- */
+  #exportPanel, #testPanel { width: 100%; max-width: 1300px; }
+  textarea {
+    width: 100%; min-height: 220px; background: #0d0d15; color: #cdd6f4;
+    border: 1px solid #444; border-radius: 8px; padding: 10px; font-family: "Consolas", monospace;
+    font-size: 0.8rem; resize: vertical;
+  }
+  #message { min-height: 22px; font-size: 0.95rem; font-weight: 600; color: var(--good); text-align: center; }
+  .hidden { display: none !important; }
+  #testBoard .cell.player.on-target { box-shadow: inset 0 0 0 3px var(--target-dot); }
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    display: flex; align-items: center; justify-content: center; z-index: 50;
+  }
+  .modal {
+    background: var(--panel); border-radius: 14px; padding: 20px;
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+    max-height: 90vh; overflow-y: auto;
+  }
+  .controls-pad {
+    display: grid; grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(2, 44px); gap: 6px;
+  }
+  .controls-pad button { font-size: 1.1rem; }
+  #up { grid-column: 2; grid-row: 1; }
+  #left { grid-column: 1; grid-row: 2; }
+  #down { grid-column: 2; grid-row: 2; }
+  #right { grid-column: 3; grid-row: 2; }
+  .footer-note { color: var(--muted); font-size: 0.78rem; text-align: center; max-width: 700px; }
+  input[type=file] { color: var(--muted); font-size: 0.8rem; }
+</style>
+</head>
+<body>
+  <h1>BOXMAN <span>LEVEL EDITOR</span></h1>
+  <div class="subtitle">Paint walls, trees, floor, targets, boxes and the player. Test-play before exporting so every level you hand off is guaranteed solvable.</div>
+
+  <div class="layout">
+    <div class="panel" id="levelListPanel">
+      <h2>Levels</h2>
+      <div id="levelList"></div>
+      <div class="level-actions">
+        <button id="addLevelBtn">+ Add</button>
+        <button id="dupLevelBtn">Dup</button>
+        <button id="delLevelBtn">Del</button>
+      </div>
+      <div class="level-actions">
+        <button id="upLevelBtn">&uarr; Up</button>
+        <button id="downLevelBtn">&darr; Down</button>
+      </div>
+    </div>
+
+    <div class="panel" id="gridPanel" style="background:transparent; padding:0;">
+      <div class="panel" style="width:100%;">
+        <h2>Canvas</h2>
+        <div class="grid-controls">
+          Size:
+          <input type="number" id="rowsInput" min="3" max="30" value="8" /> rows ×
+          <input type="number" id="colsInput" min="3" max="30" value="9" /> cols
+          <button id="resizeBtn">Resize</button>
+          <button id="borderBtn">Fill border w/ wall</button>
+          <button id="clearBtn">Clear all</button>
+        </div>
+        <div id="board"></div>
+        <div class="stats">
+          <div class="stat" id="statBoxes">Boxes: <b>0</b></div>
+          <div class="stat" id="statTargets">Targets: <b>0</b></div>
+          <div class="stat" id="statMatch">Match: <b>—</b></div>
+          <div class="stat" id="statPlayer">Player: <b>0</b></div>
+        </div>
+        <div class="row">
+          <button id="testPlayBtn" class="primary">▶ Test Play</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="toolPanel">
+      <h2>Tools</h2>
+      <button class="tool-btn active" data-tool="wall"><span class="tool-swatch swatch-wall"></span>Wall <kbd>1</kbd></button>
+      <button class="tool-btn" data-tool="tree"><span class="tool-swatch swatch-tree"></span>Tree <kbd>2</kbd></button>
+      <button class="tool-btn" data-tool="floor"><span class="tool-swatch swatch-floor"></span>Floor <kbd>3</kbd></button>
+      <button class="tool-btn" data-tool="target"><span class="tool-swatch swatch-target"></span>Target (orb) <kbd>4</kbd></button>
+      <button class="tool-btn" data-tool="box"><span class="tool-swatch swatch-box"></span>Box <kbd>5</kbd></button>
+      <button class="tool-btn" data-tool="player"><span class="tool-swatch swatch-player"></span>Player <kbd>6</kbd></button>
+      <button class="tool-btn" data-tool="eraser"><span class="tool-swatch swatch-eraser"></span>Erase item <kbd>0</kbd></button>
+      <div class="footer-note" style="margin-top:8px; text-align:left;">
+        Click or click-drag to paint. Wall/Tree/Floor replace the whole cell. Target/Box/Player sit on top of floor — painting them on a wall auto-converts it to floor first.
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="exportPanel">
+    <h2>Export / Import</h2>
+    <div class="row">
+      <button id="genJsBtn" class="primary">Generate LEVELS array (JS)</button>
+      <button id="copyJsBtn">Copy JS to clipboard</button>
+      <button id="downloadJsonBtn">Download levels.json</button>
+      <label class="tool-btn" style="display:inline-flex; width:auto; cursor:pointer;">Load JSON <input type="file" id="loadJsonInput" accept=".json" style="display:none;" /></label>
+      <button id="resetAllBtn">Reset editor (clear all levels)</button>
+    </div>
+    <textarea id="exportArea" placeholder="Click &quot;Generate LEVELS array&quot; to produce ready-to-paste code for index.html, or use Download levels.json to hand the file back to Claude."></textarea>
+    <div class="footer-note">Your work auto-saves to this browser's local storage as you edit, so refreshing the page won't lose progress. Download the JSON when you want a portable copy.</div>
+  </div>
+
+  <div id="testModal" class="modal-overlay hidden">
+    <div class="modal">
+      <h2 style="margin:0;">Test Play — <span id="testLevelName"></span></h2>
+      <div id="testBoard" style="display:grid; gap:2px; background:var(--wall-edge); padding:6px; border-radius:10px;"></div>
+      <div id="message"></div>
+      <div class="stats">
+        <div class="stat">Moves: <b id="testMoves">0</b></div>
+        <div class="stat">Pushes: <b id="testPushes">0</b></div>
+      </div>
+      <div class="controls-pad">
+        <button id="testUp">&uarr;</button>
+        <button id="testLeft">&larr;</button>
+        <button id="testDown">&darr;</button>
+        <button id="testRight">&rarr;</button>
+      </div>
+      <div class="row">
+        <button id="testUndoBtn">Undo</button>
+        <button id="testResetBtn">Reset</button>
+        <button id="testSolveBtn">Auto-Solve</button>
+        <button id="testCloseBtn" class="primary">Close</button>
+      </div>
+      <div class="footer-note">Arrow keys / WASD to move · U to undo · R to reset while this is open.</div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  const STORAGE_KEY = 'boxman-editor-levels-v2';
+
+  // ---------- data model ----------
+  // cell = { base: 'wall'|'tree'|'floor', target: bool, entity: 'none'|'box'|'player' }
+  function makeCell(base, target, entity) {
+    return { base: base || 'floor', target: !!target, entity: entity || 'none' };
+  }
+
+  function newLevel(rows, cols) {
+    rows = rows || 8; cols = cols || 9;
+    const cells = [];
+    for (let r = 0; r < rows; r++) {
+      const row = [];
+      for (let c = 0; c < cols; c++) {
+        const border = r === 0 || c === 0 || r === rows - 1 || c === cols - 1;
+        row.push(makeCell(border ? 'wall' : 'floor'));
+      }
+      cells.push(row);
+    }
+    return { rows, cols, cells };
+  }
+
+  function cloneLevel(lvl) {
+    return {
+      rows: lvl.rows,
+      cols: lvl.cols,
+      cells: lvl.cells.map(row => row.map(c => ({ ...c })))
+    };
+  }
+
+  let state = {
+    levels: [newLevel()],
+    current: 0
+  };
+
+  let currentTool = 'wall';
+  let painting = false;
+  let paintTargetState = null; // used to decide add/remove when dragging over 'target' toggling
+
+  // ---------- persistence ----------
+  function save() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+  }
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.levels) && parsed.levels.length) {
+          state = parsed;
+          if (state.current >= state.levels.length) state.current = 0;
+          return;
+        }
+      }
+    } catch (e) {}
+  }
+
+  // ---------- char <-> cell ----------
+  function cellToChar(cell) {
+    if (cell.base === 'wall' || cell.base === 'tree') return '#';
+    if (cell.entity === 'player') return cell.target ? '+' : '@';
+    if (cell.entity === 'box') return cell.target ? '*' : '$';
+    return cell.target ? '.' : ' ';
+  }
+
+  function levelToRows(lvl) {
+    return lvl.cells.map(row => row.map(cellToChar).join(''));
+  }
+
+  // ---------- DOM refs ----------
+  const boardEl = document.getElementById('board');
+  const levelListEl = document.getElementById('levelList');
+  const rowsInput = document.getElementById('rowsInput');
+  const colsInput = document.getElementById('colsInput');
+  const statBoxes = document.getElementById('statBoxes');
+  const statTargets = document.getElementById('statTargets');
+  const statMatch = document.getElementById('statMatch');
+  const statPlayer = document.getElementById('statPlayer');
+  const exportArea = document.getElementById('exportArea');
+
+  function currentLevel() { return state.levels[state.current]; }
+
+  // ---------- rendering ----------
+  function renderAll() {
+    renderLevelList();
+    renderGrid();
+    renderStats();
+    save();
+  }
+
+  function levelStats(lvl) {
+    let boxes = 0, targets = 0, players = 0;
+    for (const row of lvl.cells) {
+      for (const cell of row) {
+        if (cell.base === 'floor') {
+          if (cell.target) targets++;
+          if (cell.entity === 'box') boxes++;
+          if (cell.entity === 'player') players++;
+        }
+      }
+    }
+    return { boxes, targets, players };
+  }
+
+  function renderLevelList() {
+    levelListEl.innerHTML = '';
+    state.levels.forEach((lvl, i) => {
+      const s = levelStats(lvl);
+      const ok = s.boxes === s.targets && s.boxes > 0 && s.players === 1;
+      const tab = document.createElement('div');
+      tab.className = 'level-tab' + (i === state.current ? ' active' : '');
+      tab.innerHTML = `<span>Level ${i + 1}</span><span class="badge ${ok ? 'ok' : 'bad'}">${s.boxes}/${s.targets}${s.players !== 1 ? ' ⚠' : ''}</span>`;
+      tab.addEventListener('click', () => { state.current = i; renderAll(); });
+      levelListEl.appendChild(tab);
+    });
+  }
+
+  function renderGrid() {
+    const lvl = currentLevel();
+    rowsInput.value = lvl.rows;
+    colsInput.value = lvl.cols;
+    boardEl.style.gridTemplateColumns = `repeat(${lvl.cols}, var(--cell))`;
+    boardEl.innerHTML = '';
+    for (let r = 0; r < lvl.rows; r++) {
+      for (let c = 0; c < lvl.cols; c++) {
+        const cell = lvl.cells[r][c];
+        const div = document.createElement('div');
+        div.className = 'cell ' + cellClass(cell);
+        div.dataset.r = r;
+        div.dataset.c = c;
+        if (cell.base === 'floor' && cell.target) {
+          const dot = document.createElement('div');
+          dot.className = 'dot';
+          div.appendChild(dot);
+        }
+        if (cell.entity === 'box') {
+          const b = document.createElement('div');
+          b.className = 'box' + (cell.target ? ' done' : '');
+          div.appendChild(b);
+        }
+        if (cell.entity === 'player') {
+          const p = document.createElement('div');
+          p.className = 'player';
+          div.appendChild(p);
+        }
+        div.addEventListener('mousedown', (e) => { e.preventDefault(); painting = true; applyTool(r, c); });
+        div.addEventListener('mouseenter', () => { if (painting) applyTool(r, c); });
+        boardEl.appendChild(div);
+      }
+    }
+  }
+
+  function cellClass(cell) {
+    if (cell.base === 'wall') return 'wall';
+    if (cell.base === 'tree') return 'tree';
+    if (cell.target) return 'target';
+    return 'floor';
+  }
+
+  document.addEventListener('mouseup', () => { painting = false; });
+
+  function renderStats() {
+    const lvl = currentLevel();
+    const s = levelStats(lvl);
+    statBoxes.querySelector('b').textContent = s.boxes;
+    statTargets.querySelector('b').textContent = s.targets;
+    const match = s.boxes === s.targets && s.boxes > 0;
+    statMatch.className = 'stat ' + (match ? 'ok' : 'bad');
+    statMatch.querySelector('b').textContent = match ? 'OK' : 'mismatch';
+    statPlayer.className = 'stat ' + (s.players === 1 ? 'ok' : 'bad');
+    statPlayer.querySelector('b').textContent = s.players;
+  }
+
+  // ---------- painting ----------
+  function findPlayer(lvl) {
+    for (let r = 0; r < lvl.rows; r++)
+      for (let c = 0; c < lvl.cols; c++)
+        if (lvl.cells[r][c].entity === 'player') return { r, c };
+    return null;
+  }
+
+  function applyTool(r, c) {
+    const lvl = currentLevel();
+    const cell = lvl.cells[r][c];
+
+    switch (currentTool) {
+      case 'wall':
+        lvl.cells[r][c] = makeCell('wall');
+        break;
+      case 'tree':
+        lvl.cells[r][c] = makeCell('tree');
+        break;
+      case 'floor':
+        lvl.cells[r][c] = makeCell('floor');
+        break;
+      case 'target': {
+        if (cell.base !== 'floor') { lvl.cells[r][c] = makeCell('floor', true, 'none'); break; }
+        cell.target = !cell.target;
+        break;
+      }
+      case 'box': {
+        if (cell.base !== 'floor') cell.base = 'floor', cell.target = false;
+        if (cell.entity === 'player') { /* don't overwrite player accidentally with drag */ break; }
+        cell.entity = cell.entity === 'box' ? 'none' : 'box';
+        break;
+      }
+      case 'player': {
+        const existing = findPlayer(lvl);
+        if (existing && (existing.r !== r || existing.c !== c)) {
+          lvl.cells[existing.r][existing.c].entity = 'none';
+        }
+        if (cell.base !== 'floor') { cell.base = 'floor'; cell.target = false; }
+        cell.entity = cell.entity === 'player' ? 'none' : 'player';
+        break;
+      }
+      case 'eraser': {
+        if (cell.base === 'floor') cell.entity = 'none';
+        break;
+      }
+    }
+    renderGrid();
+    renderLevelList();
+    renderStats();
+    save();
+  }
+
+  // ---------- tool selection ----------
+  document.querySelectorAll('.tool-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentTool = btn.dataset.tool;
+      document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+  const toolKeyMap = { '1': 'wall', '2': 'tree', '3': 'floor', '4': 'target', '5': 'box', '6': 'player', '0': 'eraser' };
+  window.addEventListener('keydown', (e) => {
+    if (document.getElementById('testModal').classList.contains('hidden') && toolKeyMap[e.key]) {
+      currentTool = toolKeyMap[e.key];
+      document.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === currentTool));
+    }
+  });
+
+  // ---------- resize / clear / border ----------
+  document.getElementById('resizeBtn').addEventListener('click', () => {
+    const rows = Math.max(3, Math.min(30, parseInt(rowsInput.value, 10) || 8));
+    const cols = Math.max(3, Math.min(30, parseInt(colsInput.value, 10) || 9));
+    const lvl = currentLevel();
+    const cells = [];
+    for (let r = 0; r < rows; r++) {
+      const row = [];
+      for (let c = 0; c < cols; c++) {
+        row.push(r < lvl.rows && c < lvl.cols ? { ...lvl.cells[r][c] } : makeCell('floor'));
+      }
+      cells.push(row);
+    }
+    lvl.rows = rows; lvl.cols = cols; lvl.cells = cells;
+    renderAll();
+  });
+
+  document.getElementById('borderBtn').addEventListener('click', () => {
+    const lvl = currentLevel();
+    for (let r = 0; r < lvl.rows; r++) {
+      for (let c = 0; c < lvl.cols; c++) {
+        if (r === 0 || c === 0 || r === lvl.rows - 1 || c === lvl.cols - 1) {
+          lvl.cells[r][c] = makeCell('wall');
+        }
+      }
+    }
+    renderAll();
+  });
+
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    if (!confirm('Clear this level to an empty bordered room?')) return;
+    const lvl = currentLevel();
+    const fresh = newLevel(lvl.rows, lvl.cols);
+    lvl.cells = fresh.cells;
+    renderAll();
+  });
+
+  // ---------- level list actions ----------
+  document.getElementById('addLevelBtn').addEventListener('click', () => {
+    state.levels.push(newLevel());
+    state.current = state.levels.length - 1;
+    renderAll();
+  });
+  document.getElementById('dupLevelBtn').addEventListener('click', () => {
+    state.levels.splice(state.current + 1, 0, cloneLevel(currentLevel()));
+    state.current++;
+    renderAll();
+  });
+  document.getElementById('delLevelBtn').addEventListener('click', () => {
+    if (state.levels.length <= 1) { alert('At least one level is required.'); return; }
+    if (!confirm('Delete Level ' + (state.current + 1) + '?')) return;
+    state.levels.splice(state.current, 1);
+    state.current = Math.max(0, state.current - 1);
+    renderAll();
+  });
+  document.getElementById('upLevelBtn').addEventListener('click', () => {
+    if (state.current === 0) return;
+    const arr = state.levels;
+    [arr[state.current - 1], arr[state.current]] = [arr[state.current], arr[state.current - 1]];
+    state.current--;
+    renderAll();
+  });
+  document.getElementById('downLevelBtn').addEventListener('click', () => {
+    if (state.current >= state.levels.length - 1) return;
+    const arr = state.levels;
+    [arr[state.current + 1], arr[state.current]] = [arr[state.current], arr[state.current + 1]];
+    state.current++;
+    renderAll();
+  });
+
+  // ---------- export / import ----------
+  function generateJs() {
+    const lines = ['  const LEVELS = ['];
+    state.levels.forEach((lvl, i) => {
+      const rows = levelToRows(lvl);
+      lines.push('    [');
+      rows.forEach((row, ri) => {
+        const comma = ri < rows.length - 1 ? ',' : '';
+        lines.push('      ' + JSON.stringify(row) + comma);
+      });
+      lines.push('    ]' + (i < state.levels.length - 1 ? ',' : ''));
+    });
+    lines.push('  ];');
+    return lines.join('\n');
+  }
+
+  document.getElementById('genJsBtn').addEventListener('click', () => {
+    exportArea.value = generateJs();
+  });
+
+  document.getElementById('copyJsBtn').addEventListener('click', async () => {
+    if (!exportArea.value) exportArea.value = generateJs();
+    try {
+      await navigator.clipboard.writeText(exportArea.value);
+      flashMessage('Copied to clipboard!');
+    } catch (e) {
+      exportArea.select();
+      document.execCommand('copy');
+      flashMessage('Copied to clipboard!');
+    }
+  });
+
+  function flashMessage(text) {
+    const btn = document.getElementById('copyJsBtn');
+    const orig = btn.textContent;
+    btn.textContent = text;
+    setTimeout(() => btn.textContent = orig, 1500);
+  }
+
+  document.getElementById('downloadJsonBtn').addEventListener('click', () => {
+    const payload = state.levels.map(lvl => ({ rows: lvl.rows, cols: lvl.cols, grid: levelToRows(lvl) }));
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'levels.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  function rowsToLevel(rows) {
+    const cols = Math.max(...rows.map(r => r.length));
+    const cells = rows.map(row => {
+      const arr = [];
+      for (let c = 0; c < cols; c++) {
+        const ch = row[c] || '#';
+        if (ch === '#') arr.push(makeCell('wall'));
+        else if (ch === '.') arr.push(makeCell('floor', true, 'none'));
+        else if (ch === '$') arr.push(makeCell('floor', false, 'box'));
+        else if (ch === '*') arr.push(makeCell('floor', true, 'box'));
+        else if (ch === '@') arr.push(makeCell('floor', false, 'player'));
+        else if (ch === '+') arr.push(makeCell('floor', true, 'player'));
+        else arr.push(makeCell('floor'));
+      }
+      return arr;
+    });
+    return { rows: rows.length, cols, cells };
+  }
+
+  document.getElementById('loadJsonInput').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        if (!Array.isArray(data)) throw new Error('bad format');
+        const levels = data.map(entry => rowsToLevel(entry.grid));
+        state.levels = levels;
+        state.current = 0;
+        renderAll();
+        alert('Loaded ' + levels.length + ' level(s).');
+      } catch (err) {
+        alert('Could not parse that file: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  document.getElementById('resetAllBtn').addEventListener('click', () => {
+    if (!confirm('This clears every level in the editor. Continue?')) return;
+    state = { levels: [newLevel()], current: 0 };
+    renderAll();
+  });
+
+  // ================= TEST PLAY (mirrors index.html engine) =================
+  const testModal = document.getElementById('testModal');
+  const testBoardEl = document.getElementById('testBoard');
+  const testMessageEl = document.getElementById('message');
+  const testMovesEl = document.getElementById('testMoves');
+  const testPushesEl = document.getElementById('testPushes');
+
+  let tGrid, tTargets, tBoxes, tPlayer, tMoves, tPushes, tHistory, tSolving;
+
+  function tKey(r, c) { return r + ',' + c; }
+
+  function openTestPlay() {
+    const lvl = currentLevel();
+    const s = levelStats(lvl);
+    if (s.players !== 1) { alert('Place exactly one player before testing.'); return; }
+    if (s.boxes === 0 || s.boxes !== s.targets) { alert('Box count (' + s.boxes + ') must equal target count (' + s.targets + ') and be > 0.'); return; }
+
+    document.getElementById('testLevelName').textContent = 'Level ' + (state.current + 1);
+    const rows = levelToRows(lvl);
+    tGrid = []; tTargets = new Set(); tBoxes = new Set(); tMoves = 0; tPushes = 0; tHistory = []; tSolving = false;
+    rows.forEach((row, r) => {
+      const gridRow = [];
+      [...row].forEach((ch, c) => {
+        gridRow.push(ch === '#' ? 'wall' : 'floor');
+        if (ch === '.' || ch === '*' || ch === '+') tTargets.add(tKey(r, c));
+        if (ch === '$' || ch === '*') tBoxes.add(tKey(r, c));
+        if (ch === '@' || ch === '+') tPlayer = { r, c };
+      });
+      tGrid.push(gridRow);
+    });
+    testMessageEl.textContent = '';
+    renderTestBoard();
+    testModal.classList.remove('hidden');
+  }
+
+  function closeTestPlay() { testModal.classList.add('hidden'); }
+
+  function tIsWall(r, c) {
+    if (r < 0 || r >= tGrid.length) return true;
+    if (c < 0 || c >= tGrid[r].length) return true;
+    return tGrid[r][c] === 'wall';
+  }
+  function tIsWon() { for (const t of tTargets) if (!tBoxes.has(t)) return false; return true; }
+
+  function renderTestBoard() {
+    const rows = tGrid.length;
+    const cols = Math.max(...tGrid.map(r => r.length));
+    testBoardEl.style.gridTemplateColumns = `repeat(${cols}, 40px)`;
+    testBoardEl.innerHTML = '';
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.style.width = '40px'; cell.style.height = '40px';
+        const k = tKey(r, c);
+        if (tIsWall(r, c)) {
+          cell.classList.add('wall');
+        } else {
+          const isTarget = tTargets.has(k);
+          const isBox = tBoxes.has(k);
+          const isPlayer = tPlayer.r === r && tPlayer.c === c;
+          cell.classList.add(isTarget ? 'target' : 'floor');
+          if (isTarget) { const d = document.createElement('div'); d.className = 'dot'; cell.appendChild(d); }
+          if (isBox) { const b = document.createElement('div'); b.className = 'box' + (isTarget ? ' done' : ''); cell.appendChild(b); }
+          if (isPlayer) { const p = document.createElement('div'); p.className = 'player' + (isTarget ? ' on-target' : ''); cell.appendChild(p); }
+        }
+        testBoardEl.appendChild(cell);
+      }
+    }
+    testMovesEl.textContent = tMoves;
+    testPushesEl.textContent = tPushes;
+  }
+
+  function tDoMove(dr, dc) {
+    if (tIsWon()) return;
+    const nr = tPlayer.r + dr, nc = tPlayer.c + dc;
+    const nk = tKey(nr, nc);
+    if (tIsWall(nr, nc)) return;
+    let pushedBox = false;
+    if (tBoxes.has(nk)) {
+      const br = nr + dr, bc = nc + dc, bk = tKey(br, bc);
+      if (tIsWall(br, bc) || tBoxes.has(bk)) return;
+      tBoxes.delete(nk); tBoxes.add(bk); pushedBox = true;
+    }
+    tHistory.push({ player: { ...tPlayer }, boxKey: nk, pushedBox, targetKey: pushedBox ? tKey(nr + dr, nc + dc) : null });
+    tPlayer = { r: nr, c: nc };
+    tMoves++; if (pushedBox) tPushes++;
+    renderTestBoard();
+    if (tIsWon()) {
+      testMessageEl.textContent = `Solved in ${tMoves} moves (${tPushes} pushes)! This level is confirmed playable.`;
+    }
+  }
+
+  function tAttemptMove(dr, dc) { if (!tSolving) tDoMove(dr, dc); }
+
+  function tUndo() {
+    if (tSolving) return;
+    const last = tHistory.pop();
+    if (!last) return;
+    tPlayer = last.player;
+    if (last.pushedBox) { tBoxes.delete(last.targetKey); tBoxes.add(last.boxKey); tPushes--; }
+    tMoves--; testMessageEl.textContent = '';
+    renderTestBoard();
+  }
+
+  function tReset() { if (tSolving) return; openTestPlay(); }
+
+  function tFindSolution(maxStates = 300000) {
+    const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+    const boxSetKey = (set) => [...set].sort().join('|');
+    const isWinBoxes = (boxSet) => { for (const t of tTargets) if (!boxSet.has(t)) return false; return true; };
+    const startPlayerKey = tKey(tPlayer.r, tPlayer.c);
+    const startState = startPlayerKey + '/' + boxSetKey(tBoxes);
+    if (isWinBoxes(tBoxes)) return [];
+    const cameFrom = new Map();
+    const seen = new Set([startState]);
+    let frontier = [{ playerKey: startPlayerKey, boxes: new Set(tBoxes), state: startState }];
+    let explored = 0;
+    while (frontier.length) {
+      const next = [];
+      for (const cur of frontier) {
+        explored++;
+        if (explored > maxStates) return null;
+        const [pr, pc] = cur.playerKey.split(',').map(Number);
+        for (const [dr, dc] of dirs) {
+          const nr = pr + dr, nc = pc + dc, nk = tKey(nr, nc);
+          if (tIsWall(nr, nc)) continue;
+          let newBoxes = cur.boxes;
+          if (cur.boxes.has(nk)) {
+            const br = nr + dr, bc = nc + dc, bk = tKey(br, bc);
+            if (tIsWall(br, bc) || cur.boxes.has(bk)) continue;
+            newBoxes = new Set(cur.boxes); newBoxes.delete(nk); newBoxes.add(bk);
+          }
+          const nstate = nk + '/' + boxSetKey(newBoxes);
+          if (seen.has(nstate)) continue;
+          seen.add(nstate);
+          cameFrom.set(nstate, { prev: cur.state, dr, dc });
+          if (isWinBoxes(newBoxes)) {
+            const path = []; let s = nstate;
+            while (s !== startState) { const info = cameFrom.get(s); path.push({ dr: info.dr, dc: info.dc }); s = info.prev; }
+            path.reverse();
+            return path;
+          }
+          next.push({ playerKey: nk, boxes: newBoxes, state: nstate });
+        }
+      }
+      frontier = next;
+    }
+    return null;
+  }
+
+  function tSetControlsDisabled(disabled) {
+    document.querySelectorAll('#testModal .controls-pad button, #testModal .row button').forEach(b => b.disabled = disabled);
+  }
+
+  function tRunSolver() {
+    if (tSolving || tIsWon()) return;
+    tSolving = true; tSetControlsDisabled(true);
+    const solveBtn = document.getElementById('testSolveBtn');
+    solveBtn.textContent = 'Thinking…';
+    testMessageEl.textContent = 'Searching for a solution…';
+    setTimeout(() => {
+      const solution = tFindSolution();
+      if (!solution) {
+        testMessageEl.textContent = 'No solution found (state limit reached). This level may be unsolvable as drawn — check box/wall placement.';
+        tSolving = false; tSetControlsDisabled(false); solveBtn.textContent = 'Auto-Solve';
+        return;
+      }
+      if (solution.length === 0) {
+        testMessageEl.textContent = 'Already solved!';
+        tSolving = false; tSetControlsDisabled(false); solveBtn.textContent = 'Auto-Solve';
+        return;
+      }
+      testMessageEl.textContent = `Solvable in ${solution.length} moves — playing it out…`;
+      let i = 0;
+      const timer = setInterval(() => {
+        if (i >= solution.length) {
+          clearInterval(timer); tSolving = false; tSetControlsDisabled(false); solveBtn.textContent = 'Auto-Solve';
+          return;
+        }
+        const { dr, dc } = solution[i]; tDoMove(dr, dc); i++;
+      }, 150);
+    }, 50);
+  }
+
+  document.getElementById('testPlayBtn').addEventListener('click', openTestPlay);
+  document.getElementById('testCloseBtn').addEventListener('click', closeTestPlay);
+  document.getElementById('testUp').addEventListener('click', () => tAttemptMove(-1, 0));
+  document.getElementById('testDown').addEventListener('click', () => tAttemptMove(1, 0));
+  document.getElementById('testLeft').addEventListener('click', () => tAttemptMove(0, -1));
+  document.getElementById('testRight').addEventListener('click', () => tAttemptMove(0, 1));
+  document.getElementById('testUndoBtn').addEventListener('click', tUndo);
+  document.getElementById('testResetBtn').addEventListener('click', tReset);
+  document.getElementById('testSolveBtn').addEventListener('click', tRunSolver);
+
+  window.addEventListener('keydown', (e) => {
+    if (testModal.classList.contains('hidden')) return;
+    switch (e.key) {
+      case 'ArrowUp': case 'w': case 'W': tAttemptMove(-1, 0); e.preventDefault(); break;
+      case 'ArrowDown': case 's': case 'S': tAttemptMove(1, 0); e.preventDefault(); break;
+      case 'ArrowLeft': case 'a': case 'A': tAttemptMove(0, -1); e.preventDefault(); break;
+      case 'ArrowRight': case 'd': case 'D': tAttemptMove(0, 1); e.preventDefault(); break;
+      case 'u': case 'U': case 'Backspace': tUndo(); e.preventDefault(); break;
+      case 'r': case 'R': tReset(); e.preventDefault(); break;
+      case 'Escape': closeTestPlay(); break;
+    }
+  });
+
+  // ---------- init ----------
+  load();
+  renderAll();
+})();
+</script>
+</body>
+</html>
