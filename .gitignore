@@ -1,2 +1,14 @@
+# Personal source material used to design the levels (not part of the game)
 Photos-1-001 (1)-20260729T222357Z-1-001.zip
 Photos-1-001 (1)-20260729T222357Z-1-001/
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+.vscode/
+.idea/
+
+# Misc
+*.log
