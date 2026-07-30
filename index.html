@@ -790,7 +790,7 @@
     if (speedRunning) return;
     speedRunning = true;
     document.getElementById('speedRunBtn').textContent = '⏹ Stop Speed Run';
-    loadLevel(0);
+    // Starts from whichever level is currently selected/loaded, not always level 1.
     runSolver();
   }
 
